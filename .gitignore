@@ -2,4 +2,4 @@
 build/
 
 ## Emacs autosaves
-.*~
+*~
