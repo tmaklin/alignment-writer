@@ -1,0 +1,10 @@
+#ifndef ALIGNMENT_WRITER_VERSION_H
+#define ALIGNMENT_WRITER_VERSION_H
+// *DON'T MODIFY MANUALLY*, CMake automatically updates this file!
+// Defines variables containing the build version and timestamp
+
+#define ALIGNMENT_WRITER_BUILD_VERSION "@ALIGNMENT_WRITER_BUILD_VERSION@"
+#define ALIGNMENT_WRITER_BUILD_TIMESTAMP "@ALIGNMENT_WRITER_BUILD_TIMESTAMP@"
+
+#endif
+
