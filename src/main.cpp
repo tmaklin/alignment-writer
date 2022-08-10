@@ -38,6 +38,7 @@
 #include <iostream>
 #include <sstream>
 #include <exception>
+#include <memory>
 
 #include "bm64.h"
 #include "bmserial.h"
@@ -51,7 +52,7 @@ bool CmdOptionPresent(char **begin, char **end, const std::string &option) {
 }
 
 void parse_args(int argc, char* argv[], cxxargs::Arguments &args) {
-  args.add_short_argument<std::string>('f', "Pseudoalignment file, packed or unpacked.");
+  args.add_short_argument<std::string>('f', "Pseudoalignment file, packed or unpacked, read from cin if not supplied.", "");
   args.add_short_argument<bool>('d', "Unpack pseudoalignment.", false);
   args.add_short_argument<size_t>('n', "Number of reference sequences in the pseudoalignment (required).");
   args.add_short_argument<size_t>('r', "Number of reads in the pseudoalignment (required for unpacking).");
@@ -153,13 +154,21 @@ int main(int argc, char* argv[]) {
 	return 1;
     }
 
-    const std::string &infile = args.value<std::string>('f');
-
-    bxz::ifstream instream(infile);
-    if (args.value<bool>('d')) {
-	Unpack(args.value<size_t>('n'), args.value<size_t>('r'), &instream, &std::cout);
+    std::unique_ptr<std::istream> in;
+    if (args.value<std::string>('f').empty()) {
+	in = std::unique_ptr<std::istream>(&std::cin);
     } else {
-	Pack(args.value<size_t>('n'), &instream, &std::cout);
+	const std::string &infile = args.value<std::string>('f');
+	in = std::unique_ptr<std::istream>(new bxz::ifstream(infile));
+    }
+
+    if (args.value<bool>('d')) {
+	Unpack(args.value<size_t>('n'), args.value<size_t>('r'), in.get(), &std::cout);
+    } else {
+	Pack(args.value<size_t>('n'), in.get(), &std::cout);
+    }
+    if (args.value<std::string>('f').empty()) {
+	in.release(); // Release ownership of std::cout so we don't try to free it
     }
 
     return 0;
