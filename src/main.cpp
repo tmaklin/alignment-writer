@@ -56,6 +56,7 @@ void parse_args(int argc, char* argv[], cxxargs::Arguments &args) {
   args.add_short_argument<bool>('d', "Unpack pseudoalignment.", false);
   args.add_short_argument<size_t>('n', "Number of reference sequences in the pseudoalignment (required).");
   args.add_short_argument<size_t>('r', "Number of reads in the pseudoalignment (required for unpacking).");
+  args.add_long_argument<size_t>("buffer-size", "Buffer size for buffered packing (default: 100000", (size_t)100000);
   if (!CmdOptionPresent(argv, argv+argc, "-d")) {
       args.set_not_required('r');
   }
@@ -64,6 +65,97 @@ void parse_args(int argc, char* argv[], cxxargs::Arguments &args) {
       std::cerr << "\n" + args.help() << '\n' << '\n';
   }
   args.parse(argc, argv);
+}
+
+void Dump(bm::bvector<>::bulk_insert_iterator &it, bm::bvector<> &bits, bm::serializer<bm::bvector<>> &bvs, std::ostream *out) {
+    // Force flush on the inserter to ensure everything is saved
+    it.flush();
+
+    // Use serialization buffer class (automatic RAI, freed on destruction)
+    bm::serializer<bm::bvector<>>::buffer sbuf;
+    bvs.optimize_serialize_destroy(bits, sbuf);
+
+    //  Write to *out
+    auto sz = sbuf.size();
+    *out << sz << std::endl;
+    unsigned char* buf = sbuf.data();
+    for (size_t i = 0; i < sz; ++i) {
+	*out << buf[i];
+    }
+}
+
+void BufferedPack(const size_t &n_refs, const size_t &buffer_size, std::istream *in, std::ostream *out) {
+    // Next settings provide the lowest size (see BitMagic documentation/examples)
+    bm::serializer<bm::bvector<>> bvs;
+    bvs.byte_order_serialization(false);
+    bvs.gap_length_serialization(false);
+
+    bm::bvector<> bits;
+    bits.set_new_blocks_strat(bm::BM_GAP);
+    bm::bvector<>::bulk_insert_iterator it(bits);
+
+    size_t n_in_buffer = 0;
+    std::string line;
+    while (std::getline(*in, line)) {
+	std::stringstream stream(line);
+	std::string part;
+	std::getline(stream, part, ' ');
+	size_t read_id = std::stoul(part); // First column is a numerical ID for the read
+	while(std::getline(stream, part, ' ')) {
+	    // Buffered insertion to contiguously stored n_reads x n_refs pseudoalignment matrix
+	    it = read_id*n_refs + std::stoul(part);
+	    ++n_in_buffer;
+	}
+	if (n_in_buffer > buffer_size) {
+	    Dump(it, bits, bvs, out);
+	    bits.clear(true);
+	    bits.set_new_blocks_strat(bm::BM_GAP);
+	    n_in_buffer = 0;
+	}
+    }
+
+    Dump(it, bits, bvs, out);
+    out->flush(); // Flush
+}
+
+void UnpackBuffered(const size_t &n_refs, const size_t &n_reads, std::istream *in, std::ostream *out) {
+    // Deserialize the buffer
+    bm::bvector<> bits(n_reads*n_refs, bm::BM_GAP);
+
+    std::string line;
+    while (std::getline(*in, line)) { // Read size of next block
+	size_t next_buffer_size = std::stoul(line);
+
+	// Allocate space for the block
+	char* cbuf = new char[next_buffer_size];
+
+	// Read the next block into buf
+	in->read(cbuf, next_buffer_size);
+	unsigned char* buf = reinterpret_cast<unsigned char*>(const_cast<char*>(cbuf));
+
+	// Deserialize block (OR with old data in bits)
+	bm::deserialize(bits, buf);
+
+	delete[] cbuf;
+    }
+
+    // Use an enumerator to traverse the pseudoaligned bits
+    bm::bvector<>::enumerator en = bits.first();
+    bm::bvector<>::enumerator en_end = bits.end();
+
+    for (size_t i = 0; i < n_reads; ++i) {
+	// Write read id (data compressed with Pack() is sorted so read id is just the iterator id)
+	*out << i << ' ';
+	if (*en < i*n_refs + n_refs) { // Next pseudoalignment is for this read
+	    // Write found pseudoalignments using the enumerator
+	    while (*en < i*n_refs + n_refs && en < en_end) {
+		*out<< (*en) - i*n_refs << ' ';
+		++en;
+	    }
+	}
+	*out << '\n';
+    }
+    out->flush(); // Flush
 }
 
 void Pack(const size_t &n_refs, std::istream *in, std::ostream *out) {
@@ -163,9 +255,9 @@ int main(int argc, char* argv[]) {
     }
 
     if (args.value<bool>('d')) {
-	Unpack(args.value<size_t>('n'), args.value<size_t>('r'), in.get(), &std::cout);
+	UnpackBuffered(args.value<size_t>('n'), args.value<size_t>('r'), in.get(), &std::cout);
     } else {
-	Pack(args.value<size_t>('n'), in.get(), &std::cout);
+	BufferedPack(args.value<size_t>('n'), args.value<size_t>("buffer-size"), in.get(), &std::cout);
     }
     if (args.value<std::string>('f').empty()) {
 	in.release(); // Release ownership of std::cout so we don't try to free it
