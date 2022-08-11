@@ -39,6 +39,7 @@
 #include <sstream>
 #include <exception>
 #include <memory>
+#include <cmath>
 
 #include "bm64.h"
 #include "bmserial.h"
@@ -155,6 +156,49 @@ void UnpackBuffered(const size_t &n_refs, const size_t &n_reads, std::istream *i
 	}
 	*out << '\n';
     }
+    out->flush(); // Flush
+}
+
+void StreamingUnpackBuffered(const size_t &n_refs, const size_t &n_reads, std::istream *in, std::ostream *out) {
+    std::string line;
+    while (std::getline(*in, line)) { // Read size of next block
+	size_t next_buffer_size = std::stoul(line);
+
+	// Allocate space for the block
+	char* cbuf = new char[next_buffer_size];
+
+	// Read the next block into buf
+	in->read(cbuf, next_buffer_size);
+	unsigned char* buf = reinterpret_cast<unsigned char*>(const_cast<char*>(cbuf));
+
+	// Deserialize the buffer
+	bm::bvector<> bits;
+	// Deserialize block (OR with old data in bits)
+	bm::deserialize(bits, buf);
+
+	// Use an enumerator to traverse the pseudoaligned bits
+	bm::bvector<>::enumerator en = bits.first();
+	bm::bvector<>::enumerator en_end = bits.end();
+
+	bool first = true;
+	while (en < en_end) {
+	    size_t read_id = std::floor((*en)/n_refs);
+	    if (!first) {
+		*out << read_id << ' ';
+	    }
+	    while (std::floor((*en)/n_refs) == read_id && en < en_end) {
+		if (first) {
+		    *out << read_id << ' ';
+		    first = false;
+		}
+		*out << (*en) - read_id*n_refs << ' ';
+		++en;
+	    }
+	    *out << '\n';
+	}
+	delete[] cbuf;
+    }
+
     out->flush(); // Flush
 }
 
