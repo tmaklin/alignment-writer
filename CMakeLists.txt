@@ -19,7 +19,7 @@ else()
 endif()
 
 ## alignment-writer executable
-add_executable(alignment-writer ${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp)
+add_executable(alignment-writer ${CMAKE_CURRENT_SOURCE_DIR}/src/unpack.cpp ${CMAKE_CURRENT_SOURCE_DIR}/src/pack.cpp ${CMAKE_CURRENT_SOURCE_DIR}/src/alignment_writer.cpp)
 
 ## Check supported compression types
 find_package(BZip2)
@@ -84,6 +84,9 @@ endif()
 
 ## Include headers for dependencies
 include_directories(include ${CMAKE_CURRENT_BINARY_DIR}/include ${CMAKE_BXZSTR_HEADERS} ${CMAKE_CXXARGS_HEADERS} ${CMAKE_BITMAGIC_HEADERS} ${CMAKE_CXXIO_HEADERS})
+
+## Include project headers
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 ## Get version number from git tags
 find_package(Git)

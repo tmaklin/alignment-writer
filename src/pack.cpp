@@ -1,0 +1,138 @@
+// alignment-writer: pack/unpack Themisto pseudoalignment files
+// https://github.com/tmaklin/alignment-writer
+// Copyright (c) 2022 Tommi Mäklin (tommi@maklin.fi)
+//
+// BSD-3-Clause license
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met:
+//
+//     (1) Redistributions of source code must retain the above copyright
+//     notice, this list of conditions and the following disclaimer.
+//
+//     (2) Redistributions in binary form must reproduce the above copyright
+//     notice, this list of conditions and the following disclaimer in
+//     the documentation and/or other materials provided with the
+//     distribution.
+//
+//     (3)The name of the author may not be used to
+//     endorse or promote products derived from this software without
+//     specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+// IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+// WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+// DISCLAIMED. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT,
+// INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+// (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+// SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+// HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+// STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING
+// IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+// POSSIBILITY OF SUCH DAMAGE.
+//
+#include "pack.hpp"
+
+#include <sstream>
+
+#include "bm64.h"
+#include "bmserial.h"
+
+namespace alignment_writer {
+void WriteBuffer(bm::bvector<>::bulk_insert_iterator &it, bm::bvector<> &bits, bm::serializer<bm::bvector<>> &bvs, std::ostream *out) {
+    // Force flush on the inserter to ensure everything is saved
+    it.flush();
+
+    // Use serialization buffer class (automatic RAI, freed on destruction)
+    bm::serializer<bm::bvector<>>::buffer sbuf;
+    bvs.optimize_serialize_destroy(bits, sbuf);
+
+    //  Write to *out
+    auto sz = sbuf.size();
+    *out << sz << std::endl;
+    unsigned char* buf = sbuf.data();
+    for (size_t i = 0; i < sz; ++i) {
+	*out << buf[i];
+    }
+}
+
+void BufferedPack(const size_t &n_refs, const size_t &buffer_size, std::istream *in, std::ostream *out) {
+    // Next settings provide the lowest size (see BitMagic documentation/examples)
+    bm::serializer<bm::bvector<>> bvs;
+    bvs.byte_order_serialization(false);
+    bvs.gap_length_serialization(false);
+
+    bm::bvector<> bits;
+    bits.set_new_blocks_strat(bm::BM_GAP);
+    bm::bvector<>::bulk_insert_iterator it(bits);
+
+    size_t n_in_buffer = 0;
+    std::string line;
+    while (std::getline(*in, line)) {
+	std::stringstream stream(line);
+	std::string part;
+	std::getline(stream, part, ' ');
+	size_t read_id = std::stoul(part); // First column is a numerical ID for the read
+	while(std::getline(stream, part, ' ')) {
+	    // Buffered insertion to contiguously stored n_reads x n_refs pseudoalignment matrix
+	    it = read_id*n_refs + std::stoul(part);
+	    ++n_in_buffer;
+	}
+	if (n_in_buffer > buffer_size) {
+	    WriteBuffer(it, bits, bvs, out);
+	    bits.clear(true);
+	    bits.set_new_blocks_strat(bm::BM_GAP);
+	    n_in_buffer = 0;
+	}
+    }
+
+    WriteBuffer(it, bits, bvs, out);
+    out->flush(); // Flush
+}
+
+void Pack(const size_t &n_refs, std::istream *in, std::ostream *out) {
+    bm::bvector<> bits;
+    bits.set_new_blocks_strat(bm::BM_GAP);
+    bm::bvector<>::bulk_insert_iterator it(bits);
+
+    size_t n_reads = 0; // Count the reads
+    std::string line;
+    while (std::getline(*in, line)) {
+	std::stringstream stream(line);
+	std::string part;
+	std::getline(stream, part, ' ');
+	size_t read_id = std::stoul(part); // First column is a numerical ID for the read
+	while(std::getline(stream, part, ' ')) {
+	    // Buffered insertion to contiguously stored n_reads x n_refs pseudoalignment matrix
+	    it = read_id*n_refs + std::stoul(part);
+	}
+	++n_reads;
+    }
+
+    // Force flush on the inserter to ensure everything is saved
+    it.flush();
+
+    // Compress the pseudoalignment matrix
+    bits.resize(n_reads*n_refs); // Final size is now known
+    bits.optimize();
+    bits.freeze();
+
+    // Next settings provide the lowest size (see BitMagic documentation/examples)
+    bm::serializer<bm::bvector<>> bvs;
+    bvs.byte_order_serialization(false);
+    bvs.gap_length_serialization(false);
+
+    // Use serialization buffer class (automatic RAI, freed on destruction)
+    bm::serializer<bm::bvector<>>::buffer sbuf;
+    bvs.serialize(bits, sbuf);
+
+    //  Write to *out
+    auto sz = sbuf.size();
+    unsigned char* buf = sbuf.data();
+    for (size_t i = 0; i < sz; ++i) {
+	*out << buf[i];
+    }
+    out->flush(); // Flush
+}
+}
