@@ -129,6 +129,7 @@ void Pack(const size_t &n_refs, std::istream *in, std::ostream *out) {
 
     //  Write to *out
     auto sz = sbuf.size();
+    *out << sz << std::endl;
     unsigned char* buf = sbuf.data();
     for (size_t i = 0; i < sz; ++i) {
 	*out << buf[i];
