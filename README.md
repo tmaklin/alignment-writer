@@ -39,6 +39,11 @@ The produced `alignment.tsv` file will contain the pseudoalignment
 from the original `alignment.txt` file in sorted output (equivalent to
 using the `--sort-output` toggle when running themisto).
 
+Intersect packed alignments `alignment_1.aln` and `alignment_2.aln` and write the results to `merged.aln`
+```
+alignment-writer -f alignment_1.aln --merge alignment_2.aln -n 1000 > merged.aln
+```
+
 # License
 alignment-writer is licensed under the [BSD-3-Clause license](https://opensource.org/licenses/BSD-3-Clause). A copy of the license is supplied with the project, or can alternatively be obtained from [https://opensource.org/licenses/BSD-3-Clause](https://opensource.org/licenses/BSD-3-Clause).
 
