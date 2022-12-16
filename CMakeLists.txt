@@ -19,7 +19,11 @@ else()
 endif()
 
 ## alignment-writer executable
-add_executable(alignment-writer ${CMAKE_CURRENT_SOURCE_DIR}/src/unpack.cpp ${CMAKE_CURRENT_SOURCE_DIR}/src/pack.cpp ${CMAKE_CURRENT_SOURCE_DIR}/src/alignment_writer.cpp)
+add_executable(alignment-writer
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/unpack.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/pack.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/merge.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/alignment_writer.cpp)
 
 ## Check supported compression types
 find_package(BZip2)
@@ -81,6 +85,32 @@ else()
   endif()
   set(CMAKE_CXXARGS_HEADERS ${CMAKE_CURRENT_BINARY_DIR}/external/cxxargs/include)
 endif()
+
+## telescope
+if (DEFINED CMAKE_TELESCOPE_LIBRARY AND DEFINED CMAKE_TELESCOPE_HEADERS)
+  find_library(TELESCOPE NAMES telescope HINTS ${CMAKE_TELESCOPE_LIBRARY})
+  target_link_libraries(alignment-writer ${TELESCOPE})
+else()
+  configure_file(${CMAKE_CURRENT_SOURCE_DIR}/config/CMakeLists-telescope.txt.in ${CMAKE_BINARY_DIR}/external/telescope-download/CMakeLists.txt)
+  execute_process(COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
+    RESULT_VARIABLE result
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/external/telescope-download )
+  if(result)
+    message(FATAL_ERROR "CMake step for telescope failed: ${result}")
+  endif()
+  execute_process(COMMAND ${CMAKE_COMMAND} --build .
+    RESULT_VARIABLE result
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/external/telescope-download )
+  if(result)
+    message(FATAL_ERROR "Build step for telescope failed: ${result}")
+  endif()
+  add_subdirectory(${CMAKE_CURRENT_BINARY_DIR}/external/telescope
+                   ${CMAKE_CURRENT_BINARY_DIR}/external/telescope/build)
+  set_target_properties(telescope PROPERTIES EXCLUDE_FROM_ALL 1)
+  target_link_libraries(alignment-writer libtelescope)
+  set(CMAKE_TELESCOPE_HEADERS ${CMAKE_CURRENT_BINARY_DIR}/external/telescope/include)
+endif()
+include_directories(${CMAKE_TELESCOPE_HEADERS})
 
 ## Include headers for dependencies
 include_directories(include ${CMAKE_CURRENT_BINARY_DIR}/include ${CMAKE_BXZSTR_HEADERS} ${CMAKE_CXXARGS_HEADERS} ${CMAKE_BITMAGIC_HEADERS} ${CMAKE_CXXIO_HEADERS})
