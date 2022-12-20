@@ -41,6 +41,21 @@
 #include "bmserial.h"
 
 namespace alignment_writer {
+
+void DeserializeBuffer(const size_t buffer_size, std::istream *in, bm::bvector<> *out) {
+  // Allocate space for the block
+  char* cbuf = new char[buffer_size];
+
+  // Read the next block into buf
+  in->read(cbuf, buffer_size);
+  unsigned char* buf = reinterpret_cast<unsigned char*>(const_cast<char*>(cbuf));
+
+  // Deserialize block (OR with old data in bits)
+  bm::deserialize((*out), buf);
+
+  delete[] cbuf;
+}
+
 void UnpackBuffered(const size_t &n_refs, const size_t &n_reads, std::istream *in, std::ostream *out) {
     // Deserialize the buffer
     bm::bvector<> bits(n_reads*n_refs, bm::BM_GAP);
@@ -48,18 +63,7 @@ void UnpackBuffered(const size_t &n_refs, const size_t &n_reads, std::istream *i
     std::string line;
     while (std::getline(*in, line)) { // Read size of next block
 	size_t next_buffer_size = std::stoul(line);
-
-	// Allocate space for the block
-	char* cbuf = new char[next_buffer_size];
-
-	// Read the next block into buf
-	in->read(cbuf, next_buffer_size);
-	unsigned char* buf = reinterpret_cast<unsigned char*>(const_cast<char*>(cbuf));
-
-	// Deserialize block (OR with old data in bits)
-	bm::deserialize(bits, buf);
-
-	delete[] cbuf;
+	DeserializeBuffer(next_buffer_size, in, &bits);
     }
 
     // Use an enumerator to traverse the pseudoaligned bits
@@ -84,19 +88,9 @@ void UnpackBuffered(const size_t &n_refs, const size_t &n_reads, std::istream *i
 void StreamingUnpackBuffered(const size_t &n_refs, const size_t &n_reads, std::istream *in, std::ostream *out) {
     std::string line;
     while (std::getline(*in, line)) { // Read size of next block
-	size_t next_buffer_size = std::stoul(line);
-
-	// Allocate space for the block
-	char* cbuf = new char[next_buffer_size];
-
-	// Read the next block into buf
-	in->read(cbuf, next_buffer_size);
-	unsigned char* buf = reinterpret_cast<unsigned char*>(const_cast<char*>(cbuf));
-
-	// Deserialize the buffer
 	bm::bvector<> bits;
-	// Deserialize block (OR with old data in bits)
-	bm::deserialize(bits, buf);
+	size_t next_buffer_size = std::stoul(line);
+	DeserializeBuffer(next_buffer_size, in, &bits)
 
 	// Use an enumerator to traverse the pseudoaligned bits
 	bm::bvector<>::enumerator en = bits.first();
@@ -118,7 +112,6 @@ void StreamingUnpackBuffered(const size_t &n_refs, const size_t &n_reads, std::i
 	    }
 	    *out << '\n';
 	}
-	delete[] cbuf;
     }
 
     out->flush(); // Flush
