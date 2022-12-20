@@ -37,7 +37,6 @@
 #include <string>
 #include <cmath>
 
-#include "bm64.h"
 #include "bmserial.h"
 
 namespace alignment_writer {
