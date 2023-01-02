@@ -89,7 +89,7 @@ void StreamingUnpackBuffered(const size_t &n_refs, const size_t &n_reads, std::i
     while (std::getline(*in, line)) { // Read size of next block
 	bm::bvector<> bits;
 	size_t next_buffer_size = std::stoul(line);
-	DeserializeBuffer(next_buffer_size, in, &bits)
+	DeserializeBuffer(next_buffer_size, in, &bits);
 
 	// Use an enumerator to traverse the pseudoaligned bits
 	bm::bvector<>::enumerator en = bits.first();
