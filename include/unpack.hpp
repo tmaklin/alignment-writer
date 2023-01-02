@@ -51,6 +51,7 @@ void UnpackPlain(std::istream *in, std::ostream *out);
 
 // Deserialize one section of data written with BufferedPack
 void DeserializeBuffer(std::istream *in, bm::bvector<> *out);
+void DeserializeBuffer(const size_t buffer_size, std::istream *in, bm::bvector<> *out);
 
 // Function for reading the header line of the alignment file
 void ReadHeader(std::istream *in, size_t *n_reads, size_t *n_refs);
