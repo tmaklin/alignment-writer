@@ -54,12 +54,16 @@ bool CmdOptionPresent(char **begin, char **end, const std::string &option) {
 void parse_args(int argc, char* argv[], cxxargs::Arguments &args) {
   args.add_short_argument<std::string>('f', "Pseudoalignment file, packed or unpacked, read from cin if not supplied.", "");
   args.add_short_argument<bool>('d', "Unpack pseudoalignment.", false);
-  args.add_short_argument<size_t>('n', "Number of reference sequences in the pseudoalignment (required).");
-  args.add_short_argument<size_t>('r', "Number of reads in the pseudoalignment (required).");
+  args.add_short_argument<size_t>('n', "Number of reference sequences in the pseudoalignment (required for packing).");
+  args.add_short_argument<size_t>('r', "Number of reads in the pseudoalignment (required for packing).");
   args.add_long_argument<size_t>("buffer-size", "Buffer size for buffered packing (default: 100000", (size_t)100000);
   args.add_long_argument<std::string>("merge", "Intersect the pseudoalignment from this file with the file in -f.", "");
   if (CmdOptionPresent(argv, argv+argc, "--merge")) {
       args.set_not_required('r');
+  }
+  if (CmdOptionPresent(argv, argv+argc, "-d")) {
+      args.set_not_required('r');
+      args.set_not_required('n');
   }
   args.add_long_argument<bool>("help", "Print the help message.", false);
   if (CmdOptionPresent(argv, argv+argc, "--help")) {
