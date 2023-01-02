@@ -91,7 +91,7 @@ else()
 endif()
 
 ## telescope
-if (DEFINED CMAKE_TELESCOPE_LIBRARY AND DEFINED CMAKE_TELESCOPE_HEADERS)
+if (DEFINED CMAKE_TELESCOPE_HEADERS)
   target_link_libraries(alignment-writer libtelescope)
 else()
   configure_file(${CMAKE_CURRENT_SOURCE_DIR}/config/CMakeLists-telescope.txt.in ${CMAKE_BINARY_DIR}/external/telescope-download/CMakeLists.txt)
