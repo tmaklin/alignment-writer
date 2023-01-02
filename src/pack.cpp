@@ -40,6 +40,11 @@
 #include "bmserial.h"
 
 namespace alignment_writer {
+void WriteHeader(const size_t n_refs, const size_t n_reads, std::ostream *out) {
+    // Write the header line of the packed format
+    *out << n_reads << ',' << n_refs << '\n';
+}
+
 void WriteBuffer(bm::bvector<>::bulk_insert_iterator &it, bm::bvector<> &bits, bm::serializer<bm::bvector<>> &bvs, std::ostream *out) {
     // Force flush on the inserter to ensure everything is saved
     it.flush();
@@ -50,14 +55,17 @@ void WriteBuffer(bm::bvector<>::bulk_insert_iterator &it, bm::bvector<> &bits, b
 
     //  Write to *out
     auto sz = sbuf.size();
-    *out << sz << std::endl;
+    *out << sz << '\n';
     unsigned char* buf = sbuf.data();
     for (size_t i = 0; i < sz; ++i) {
 	*out << buf[i];
     }
 }
 
-void BufferedPack(const size_t &n_refs, const size_t &buffer_size, std::istream *in, std::ostream *out) {
+void BufferedPack(const size_t n_refs, const size_t n_reads, const size_t &buffer_size, std::istream *in, std::ostream *out) {
+    // Write info about the pseudoalignment
+    WriteHeader(n_refs, n_reads, out);
+
     // Next settings provide the lowest size (see BitMagic documentation/examples)
     bm::serializer<bm::bvector<>> bvs;
     bvs.byte_order_serialization(false);
@@ -87,16 +95,19 @@ void BufferedPack(const size_t &n_refs, const size_t &buffer_size, std::istream 
 	}
     }
 
+    // Write the remaining bits
     WriteBuffer(it, bits, bvs, out);
     out->flush(); // Flush
 }
 
-void Pack(const size_t &n_refs, std::istream *in, std::ostream *out) {
+void Pack(const size_t n_refs, const size_t n_reads, std::istream *in, std::ostream *out) {
+    // Write info about the pseudoalignment
+    WriteHeader(n_refs, n_reads, out);
+
     bm::bvector<> bits;
     bits.set_new_blocks_strat(bm::BM_GAP);
     bm::bvector<>::bulk_insert_iterator it(bits);
 
-    size_t n_reads = 0; // Count the reads
     std::string line;
     while (std::getline(*in, line)) {
 	std::stringstream stream(line);
@@ -107,16 +118,10 @@ void Pack(const size_t &n_refs, std::istream *in, std::ostream *out) {
 	    // Buffered insertion to contiguously stored n_reads x n_refs pseudoalignment matrix
 	    it = read_id*n_refs + std::stoul(part);
 	}
-	++n_reads;
     }
 
     // Force flush on the inserter to ensure everything is saved
     it.flush();
-
-    // Compress the pseudoalignment matrix
-    bits.resize(n_reads*n_refs); // Final size is now known
-    bits.optimize();
-    bits.freeze();
 
     // Next settings provide the lowest size (see BitMagic documentation/examples)
     bm::serializer<bm::bvector<>> bvs;
@@ -125,11 +130,11 @@ void Pack(const size_t &n_refs, std::istream *in, std::ostream *out) {
 
     // Use serialization buffer class (automatic RAI, freed on destruction)
     bm::serializer<bm::bvector<>>::buffer sbuf;
-    bvs.serialize(bits, sbuf);
+    bvs.optimize_serialize_destroy(bits, sbuf);
 
     //  Write to *out
     auto sz = sbuf.size();
-    *out << sz << std::endl;
+    *out << sz << '\n';
     unsigned char* buf = sbuf.data();
     for (size_t i = 0; i < sz; ++i) {
 	*out << buf[i];

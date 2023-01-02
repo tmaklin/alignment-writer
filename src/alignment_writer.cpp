@@ -55,12 +55,9 @@ void parse_args(int argc, char* argv[], cxxargs::Arguments &args) {
   args.add_short_argument<std::string>('f', "Pseudoalignment file, packed or unpacked, read from cin if not supplied.", "");
   args.add_short_argument<bool>('d', "Unpack pseudoalignment.", false);
   args.add_short_argument<size_t>('n', "Number of reference sequences in the pseudoalignment (required).");
-  args.add_short_argument<size_t>('r', "Number of reads in the pseudoalignment (required for unpacking).");
+  args.add_short_argument<size_t>('r', "Number of reads in the pseudoalignment (required).");
   args.add_long_argument<size_t>("buffer-size", "Buffer size for buffered packing (default: 100000", (size_t)100000);
   args.add_long_argument<std::string>("merge", "Intersect the pseudoalignment from this file with the file in -f.", "");
-  if (!CmdOptionPresent(argv, argv+argc, "-d")) {
-      args.set_not_required('r');
-  }
   if (CmdOptionPresent(argv, argv+argc, "--merge")) {
       args.set_not_required('r');
   }
@@ -99,7 +96,7 @@ int main(int argc, char* argv[]) {
       std::vector<std::istream*> infiles({ in.get(), pair.get() });
       alignment_writer::Merge(telescope::get_mode("intersection"), args.value<size_t>('n'), infiles, &std::cout);
     } else {
-	alignment_writer::BufferedPack(args.value<size_t>('n'), args.value<size_t>("buffer-size"), in.get(), &std::cout);
+      alignment_writer::BufferedPack(args.value<size_t>('n'), args.value<size_t>('r'), args.value<size_t>("buffer-size"), in.get(), &std::cout);
     }
     if (args.value<std::string>('f').empty()) {
 	in.release(); // Release ownership of std::cout so we don't try to free it
