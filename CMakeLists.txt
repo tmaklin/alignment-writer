@@ -97,32 +97,6 @@ else()
 endif()
 include_directories(${CMAKE_CXXARGS_HEADERS})
 
-## telescope
-if (DEFINED CMAKE_TELESCOPE_HEADERS)
-  message(STATUS "telescope headers provided in: ${CMAKE_TELESCOPE_HEADERS}")
-  target_link_libraries(alignment-writer libtelescope)
-else()
-  configure_file(${CMAKE_CURRENT_SOURCE_DIR}/config/CMakeLists-telescope.txt.in ${CMAKE_BINARY_DIR}/external/telescope-download/CMakeLists.txt)
-  execute_process(COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
-    RESULT_VARIABLE result
-    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/external/telescope-download )
-  if(result)
-    message(FATAL_ERROR "CMake step for telescope failed: ${result}")
-  endif()
-  execute_process(COMMAND ${CMAKE_COMMAND} --build .
-    RESULT_VARIABLE result
-    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/external/telescope-download )
-  if(result)
-    message(FATAL_ERROR "Build step for telescope failed: ${result}")
-  endif()
-  add_subdirectory(${CMAKE_CURRENT_BINARY_DIR}/external/telescope
-                   ${CMAKE_CURRENT_BINARY_DIR}/external/telescope/build)
-  set_target_properties(telescope PROPERTIES EXCLUDE_FROM_ALL 1)
-  target_link_libraries(alignment-writer libtelescope)
-  set(CMAKE_TELESCOPE_HEADERS ${CMAKE_CURRENT_BINARY_DIR}/external/telescope/include)
-endif()
-include_directories(${CMAKE_TELESCOPE_HEADERS})
-
 ## Include project headers
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
