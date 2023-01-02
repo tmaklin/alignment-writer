@@ -29,6 +29,10 @@ set_target_properties(libalignmentwriter PROPERTIES OUTPUT_NAME alignment-writer
 add_executable(alignment-writer ${CMAKE_CURRENT_SOURCE_DIR}/src/alignment_writer.cpp)
 target_link_libraries(alignment-writer libalignmentwriter)
 
+## Own header files
+set(CMAKE_ALIGNMENT_WRITER_HEADERS ${CMAKE_CURRENT_BINARY_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/include)
+include_directories(${CMAKE_ALIGNMENT_WRITER_HEADERS})
+
 ## Check supported compression types
 find_package(BZip2)
 if (BZIP2_FOUND)
@@ -49,6 +53,7 @@ endif()
 ## Check dependencies and download them if not found
 ## BitMagic - supplied with the project
 set(CMAKE_BITMAGIC_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/external/BitMagic-7.12.3/src)
+include_directories(${CMAKE_BITMAGIC_HEADERS})
 
 ## bxzstr
 if (DEFINED CMAKE_BXZSTR_HEADERS)
@@ -69,6 +74,7 @@ else()
   endif()
   set(CMAKE_BXZSTR_HEADERS ${CMAKE_CURRENT_BINARY_DIR}/external/bxzstr/include)
 endif()
+include_directories(${CMAKE_BXZSTR_HEADERS})
 
 ## cxxargs
 if (DEFINED CMAKE_CXXARGS_HEADERS)
@@ -89,6 +95,7 @@ else()
   endif()
   set(CMAKE_CXXARGS_HEADERS ${CMAKE_CURRENT_BINARY_DIR}/external/cxxargs/include)
 endif()
+include_directories(${CMAKE_CXXARGS_HEADERS})
 
 ## telescope
 if (DEFINED CMAKE_TELESCOPE_HEADERS)
@@ -115,9 +122,6 @@ else()
   set(CMAKE_TELESCOPE_HEADERS ${CMAKE_CURRENT_BINARY_DIR}/external/telescope/include)
 endif()
 include_directories(${CMAKE_TELESCOPE_HEADERS})
-
-## Include headers for dependencies
-include_directories(include ${CMAKE_CURRENT_BINARY_DIR}/include ${CMAKE_BXZSTR_HEADERS} ${CMAKE_CXXARGS_HEADERS} ${CMAKE_BITMAGIC_HEADERS} ${CMAKE_CXXIO_HEADERS})
 
 ## Include project headers
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
