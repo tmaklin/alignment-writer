@@ -18,12 +18,16 @@ else()
   add_compile_options(-std=c++17)
 endif()
 
-## alignment-writer executable
-add_executable(alignment-writer
+## alignment-writer library
+add_library(libalignmentwriter
   ${CMAKE_CURRENT_SOURCE_DIR}/src/unpack.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/pack.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/merge.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/alignment_writer.cpp)
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/merge.cpp)
+set_target_properties(libalignmentwriter PROPERTIES OUTPUT_NAME alignment-writer)
+
+## alignment-writer executable
+add_executable(alignment-writer ${CMAKE_CURRENT_SOURCE_DIR}/src/alignment_writer.cpp)
+target_link_libraries(alignment-writer libalignmentwriter)
 
 ## Check supported compression types
 find_package(BZip2)
