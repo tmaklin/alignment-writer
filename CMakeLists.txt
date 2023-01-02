@@ -21,8 +21,7 @@ endif()
 ## alignment-writer library
 add_library(libalignmentwriter
   ${CMAKE_CURRENT_SOURCE_DIR}/src/unpack.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/pack.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/merge.cpp)
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/pack.cpp)
 set_target_properties(libalignmentwriter PROPERTIES OUTPUT_NAME alignment-writer)
 
 ## alignment-writer executable
