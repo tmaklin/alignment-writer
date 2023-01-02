@@ -36,10 +36,20 @@
 
 #include <string>
 #include <cmath>
+#include <sstream>
 
 #include "bmserial.h"
 
 namespace alignment_writer {
+void ReadHeader(std::istream *in, size_t *n_reads, size_t *n_refs) {
+    std::string line;
+    std::getline(*in, line);
+    std::stringstream header(line);
+    std::getline(header, line, ',');
+    (*n_reads) = std::stoul(line); // First value is number of reads
+    std::getline(header, line, ',');
+    (*n_refs) = std::stoul(line); // Second value is number of references
+}
 
 void DeserializeBuffer(const size_t buffer_size, std::istream *in, bm::bvector<> *out) {
   // Allocate space for the block
@@ -55,7 +65,12 @@ void DeserializeBuffer(const size_t buffer_size, std::istream *in, bm::bvector<>
   delete[] cbuf;
 }
 
-void UnpackBuffered(const size_t &n_refs, const size_t &n_reads, std::istream *in, std::ostream *out) {
+void UnpackBuffered(std::istream *in, std::ostream *out) {
+    // Read size of alignment from the file
+    size_t n_reads;
+    size_t n_refs;
+    ReadHeader(in, &n_reads, &n_refs);
+
     // Deserialize the buffer
     bm::bvector<> bits(n_reads*n_refs, bm::BM_GAP);
 
@@ -84,7 +99,12 @@ void UnpackBuffered(const size_t &n_refs, const size_t &n_reads, std::istream *i
     out->flush(); // Flush
 }
 
-void StreamingUnpackBuffered(const size_t &n_refs, const size_t &n_reads, std::istream *in, std::ostream *out) {
+void StreamingUnpackBuffered(std::istream *in, std::ostream *out) {
+    // Read size of alignment from the file
+    size_t n_reads;
+    size_t n_refs;
+    ReadHeader(in, &n_reads, &n_refs);
+
     std::string line;
     while (std::getline(*in, line)) { // Read size of next block
 	bm::bvector<> bits;
@@ -117,7 +137,12 @@ void StreamingUnpackBuffered(const size_t &n_refs, const size_t &n_reads, std::i
 }
 
 
-void UnpackPlain(const size_t &n_refs, const size_t &n_reads, std::istream *in, std::ostream *out) {
+void UnpackPlain(std::istream *in, std::ostream *out) {
+    // Read size of alignment from the file
+    size_t n_reads;
+    size_t n_refs;
+    ReadHeader(in, &n_reads, &n_refs);
+
     // Read *in into a buffer
     std::string contents;
     contents.assign(std::istreambuf_iterator<char>(*in),

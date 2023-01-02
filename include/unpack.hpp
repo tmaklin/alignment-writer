@@ -43,14 +43,14 @@
 
 namespace alignment_writer {
 // Read in data that has been written using BufferedPack
-void UnpackBuffered(const size_t &n_refs, const size_t &n_reads, std::istream *in, std::ostream *out);
-void StreamingUnpackBuffered(const size_t &n_refs, const size_t &n_reads, std::istream *in, std::ostream *out);
+void UnpackBuffered(std::istream *in, std::ostream *out);
+void StreamingUnpackBuffered(std::istream *in, std::ostream *out);
 
 // Read in data written with Pack
-void UnpackPlain(const size_t &n_refs, const size_t &n_reads, std::istream *in, std::ostream *out);
+void UnpackPlain(std::istream *in, std::ostream *out);
 
 // Deserialize one section of data written with BufferedPack
-void DeserializeBuffer(const size_t buffer_size, std::istream *in, bm::bvector<> *out);
+void DeserializeBuffer(std::istream *in, bm::bvector<> *out);
 }
 
 #endif

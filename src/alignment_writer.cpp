@@ -89,7 +89,7 @@ int main(int argc, char* argv[]) {
     }
 
     if (args.value<bool>('d')) {
-	alignment_writer::UnpackBuffered(args.value<size_t>('n'), args.value<size_t>('r'), in.get(), &std::cout);
+	alignment_writer::UnpackBuffered(in.get(), &std::cout);
     } else if (!args.value<std::string>("merge").empty()) {
       const std::string &in_2 = args.value<std::string>("merge");
       std::unique_ptr<std::istream> pair(new bxz::ifstream(in_2));
