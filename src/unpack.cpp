@@ -135,3 +135,4 @@ void StreamingUnpackBuffered(std::istream *in, std::ostream *out) {
 
     out->flush(); // Flush
 }
+}
