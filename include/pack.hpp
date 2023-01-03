@@ -39,11 +39,13 @@
 #include <istream>
 #include <ostream>
 
-namespace alignment_writer {
-// Pack the whole pseudoalignment in-memory and write after (memory usage approx. same as size of gzipped pseudoalignment file on disk)
-void Pack(const size_t n_refs, const size_t n_reads, std::istream *in, std::ostream *out);
+#include "bm64.h"
 
-// Pack the pseudoalignment in chunks and write chunks while packing (memory usage controlled by buffer_size)
+namespace alignment_writer {
+// Pack a pseudoalignment that is already in memory
+void Pack(const size_t n_refs, const size_t n_reads, const bm::bvector<> &bits, std::ostream *out);
+
+// Buffered read of a pseudoalignment from a stream and packing
 void BufferedPack(const size_t n_refs, const size_t n_reads, const size_t &buffer_size, std::istream *in, std::ostream *out);
 }
 

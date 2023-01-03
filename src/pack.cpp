@@ -45,10 +45,7 @@ void WriteHeader(const size_t n_refs, const size_t n_reads, std::ostream *out) {
     *out << n_reads << ',' << n_refs << '\n';
 }
 
-void WriteBuffer(bm::bvector<>::bulk_insert_iterator &it, bm::bvector<> &bits, bm::serializer<bm::bvector<>> &bvs, std::ostream *out) {
-    // Force flush on the inserter to ensure everything is saved
-    it.flush();
-
+void WriteBuffer(bm::bvector<> &bits, bm::serializer<bm::bvector<>> &bvs, std::ostream *out) {
     // Use serialization buffer class (automatic RAI, freed on destruction)
     bm::serializer<bm::bvector<>>::buffer sbuf;
     bvs.optimize_serialize_destroy(bits, sbuf);
@@ -63,6 +60,7 @@ void WriteBuffer(bm::bvector<>::bulk_insert_iterator &it, bm::bvector<> &bits, b
 }
 
 void BufferedPack(const size_t n_refs, const size_t n_reads, const size_t &buffer_size, std::istream *in, std::ostream *out) {
+    // Buffered read + packing from a stream
     // Write info about the pseudoalignment
     WriteHeader(n_refs, n_reads, out);
 
@@ -88,7 +86,10 @@ void BufferedPack(const size_t n_refs, const size_t n_reads, const size_t &buffe
 	    ++n_in_buffer;
 	}
 	if (n_in_buffer > buffer_size) {
-	    WriteBuffer(it, bits, bvs, out);
+  	    // Force flush on the inserter to ensure everything is saved
+	    it.flush();
+
+	    WriteBuffer(bits, bvs, out);
 	    bits.clear(true);
 	    bits.set_new_blocks_strat(bm::BM_GAP);
 	    n_in_buffer = 0;
@@ -96,49 +97,22 @@ void BufferedPack(const size_t n_refs, const size_t n_reads, const size_t &buffe
     }
 
     // Write the remaining bits
-    WriteBuffer(it, bits, bvs, out);
+    it.flush();
+    WriteBuffer(bits, bvs, out);
     out->flush(); // Flush
 }
 
-void Pack(const size_t n_refs, const size_t n_reads, std::istream *in, std::ostream *out) {
+void Pack(const size_t n_refs, const size_t n_reads, bm::bvector<> &bits, std::ostream *out) {
+    // Pack a pseudoalignment that has been stored in memory
     // Write info about the pseudoalignment
     WriteHeader(n_refs, n_reads, out);
-
-    bm::bvector<> bits;
-    bits.set_new_blocks_strat(bm::BM_GAP);
-    bm::bvector<>::bulk_insert_iterator it(bits);
-
-    std::string line;
-    while (std::getline(*in, line)) {
-	std::stringstream stream(line);
-	std::string part;
-	std::getline(stream, part, ' ');
-	size_t read_id = std::stoul(part); // First column is a numerical ID for the read
-	while(std::getline(stream, part, ' ')) {
-	    // Buffered insertion to contiguously stored n_reads x n_refs pseudoalignment matrix
-	    it = read_id*n_refs + std::stoul(part);
-	}
-    }
-
-    // Force flush on the inserter to ensure everything is saved
-    it.flush();
 
     // Next settings provide the lowest size (see BitMagic documentation/examples)
     bm::serializer<bm::bvector<>> bvs;
     bvs.byte_order_serialization(false);
     bvs.gap_length_serialization(false);
 
-    // Use serialization buffer class (automatic RAI, freed on destruction)
-    bm::serializer<bm::bvector<>>::buffer sbuf;
-    bvs.optimize_serialize_destroy(bits, sbuf);
-
-    //  Write to *out
-    auto sz = sbuf.size();
-    *out << sz << '\n';
-    unsigned char* buf = sbuf.data();
-    for (size_t i = 0; i < sz; ++i) {
-	*out << buf[i];
-    }
+    WriteBuffer(bits, bvs, out);
     out->flush(); // Flush
 }
 }
