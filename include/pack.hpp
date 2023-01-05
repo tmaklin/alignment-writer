@@ -43,7 +43,7 @@
 
 namespace alignment_writer {
 // Pack a pseudoalignment that is already in memory
-void Pack(const size_t n_refs, const size_t n_reads, bm::bvector<> &bits, std::ostream *out);
+void Pack(const bm::bvector<> &bits, const size_t n_refs, const size_t n_reads, std::ostream *out);
 
 // Buffered read of a pseudoalignment from a stream and packing
 void BufferedPack(const size_t n_refs, const size_t n_reads, const size_t &buffer_size, std::istream *in, std::ostream *out);

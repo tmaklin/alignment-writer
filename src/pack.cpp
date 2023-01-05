@@ -45,10 +45,10 @@ void WriteHeader(const size_t n_refs, const size_t n_reads, std::ostream *out) {
     *out << n_reads << ',' << n_refs << '\n';
 }
 
-void WriteBuffer(bm::bvector<> &bits, bm::serializer<bm::bvector<>> &bvs, std::ostream *out) {
+void WriteBuffer(const bm::bvector<> &bits, bm::serializer<bm::bvector<>> &bvs, std::ostream *out) {
     // Use serialization buffer class (automatic RAI, freed on destruction)
     bm::serializer<bm::bvector<>>::buffer sbuf;
-    bvs.optimize_serialize_destroy(bits, sbuf);
+    bvs.serialize(bits, sbuf);
 
     //  Write to *out
     auto sz = sbuf.size();
