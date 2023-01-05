@@ -102,7 +102,7 @@ void BufferedPack(const size_t n_refs, const size_t n_reads, const size_t &buffe
     out->flush(); // Flush
 }
 
-void Pack(bm::bvector<> &bits, const size_t n_refs, const size_t n_reads, std::ostream *out) {
+void Pack(const bm::bvector<> &bits, const size_t n_refs, const size_t n_reads, std::ostream *out) {
     // Pack a pseudoalignment that has been stored in memory
     // Write info about the pseudoalignment
     WriteHeader(n_refs, n_reads, out);
