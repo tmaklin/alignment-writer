@@ -41,10 +41,9 @@
 #include "bmserial.h"
 
 namespace alignment_writer {
-void ReadHeader(std::istream *in, size_t *n_reads, size_t *n_refs) {
+void ReadHeader(const std::string &header_line, size_t *n_reads, size_t *n_refs) {
+    std::stringstream header(header_line);
     std::string line;
-    std::getline(*in, line);
-    std::stringstream header(line);
     std::getline(header, line, ',');
     (*n_reads) = std::stoul(line); // First value is number of reads
     std::getline(header, line, ',');
@@ -69,12 +68,13 @@ void UnpackBuffered(std::istream *in, std::ostream *out) {
     // Read size of alignment from the file
     size_t n_reads;
     size_t n_refs;
-    ReadHeader(in, &n_reads, &n_refs);
+    std::string line;
+    std::getline(*in, line);
+    ReadHeader(line, &n_reads, &n_refs);
 
     // Deserialize the buffer
     bm::bvector<> bits(n_reads*n_refs, bm::BM_GAP);
 
-    std::string line;
     while (std::getline(*in, line)) { // Read size of next block
 	size_t next_buffer_size = std::stoul(line);
 	DeserializeBuffer(next_buffer_size, in, &bits);
@@ -103,9 +103,10 @@ void StreamingUnpackBuffered(std::istream *in, std::ostream *out) {
     // Read size of alignment from the file
     size_t n_reads;
     size_t n_refs;
-    ReadHeader(in, &n_reads, &n_refs);
-
     std::string line;
+    std::getline(*in, line);
+    ReadHeader(line, &n_reads, &n_refs);
+
     while (std::getline(*in, line)) { // Read size of next block
 	bm::bvector<> bits;
 	size_t next_buffer_size = std::stoul(line);

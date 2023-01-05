@@ -50,7 +50,7 @@ void StreamingUnpackBuffered(std::istream *in, std::ostream *out);
 void DeserializeBuffer(const size_t buffer_size, std::istream *in, bm::bvector<> *out);
 
 // Function for reading the header line of the alignment file
-void ReadHeader(std::istream *in, size_t *n_reads, size_t *n_refs);
+void ReadHeader(const std::string &header_line, size_t *n_reads, size_t *n_refs);
 }
 
 #endif
