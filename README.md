@@ -21,6 +21,7 @@ pseudoalignment files into/from a compact representation using the
 - This will compile the alignment-writer executable in build/bin/.
 
 # Usage
+## Read from a file
 All calls print the results to cout.
 
 Pack a themisto pseudoalignment file `alignment.txt.gz` containing `2000000` reads pseudoaligned against `1000` reference
@@ -38,6 +39,14 @@ The produced `alignment.tsv` file will contain the pseudoalignments
 from the original `alignment.txt.gz` file sorted according to the
 first column (read_id). This is equivalent to using the
 `--sort-output` toggle when running themisto.
+
+## Read from cin
+Omitting the `-f` option sets alignment-writer to read input from
+cin. This can be used to pack the output from
+[Themisto](https://github.com/algbio/themisto) without first writing it to disk
+```
+themisto pseudoalign -q query_reads.fastq -i index --temp-dir tmp | alignment-writer -n <number of reference sequences> -r <number of reads> > alignment.aln
+```
 
 # File format
 Alignment-writer writes the packed pseudoalignments in chunks
