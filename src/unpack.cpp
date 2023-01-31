@@ -140,17 +140,15 @@ void StreamingUnpack(std::istream *in, std::ostream *out) {
     out->flush(); // Flush
 }
 
-bm::bvector<> Unpack(std::istream *infile) {
+bm::bvector<> Unpack(std::istream *infile, size_t *n_reads, size_t *n_refs) {
     std::string next_line;
 
     // Read the number of reads and reference sequences from the first line
     std::getline(*infile, next_line);
-    size_t n_reads;
-    size_t n_refs;
-    alignment_writer::ReadHeader(next_line, &n_reads, &n_refs);
+    alignment_writer::ReadHeader(next_line, n_reads, n_refs);
 
     // Read the chunks into `pseudoalignment`
-    bm::bvector<> pseudoalignment(n_reads*n_refs);
+    bm::bvector<> pseudoalignment((*n_reads)*(*n_refs));
     while (std::getline(*infile, next_line)) {
         size_t next_buffer_size = std::stoul(next_line); // Read the size of the next chunk
 	alignment_writer::DeserializeBuffer(next_buffer_size, infile, &pseudoalignment); // Read the next chunk
@@ -162,16 +160,14 @@ bm::bvector<> Unpack(std::istream *infile) {
     return pseudoalignment;
 }
 
-bm::bvector<> ParallelUnpack(std::istream *infile) {
+bm::bvector<> ParallelUnpack(std::istream *infile, size_t *n_reads, size_t *n_refs) {
 #if defined(ALIGNMENTWRITER_OPENMP_SUPPORT) && (ALIGNMENTWRITER_OPENMP_SUPPORT) == 1
     std::string next_line;
     size_t n_threads;
 
     // Read the number of reads and reference sequences from the first line
     std::getline(*infile, next_line);
-    size_t n_reads;
-    size_t n_refs;
-    alignment_writer::ReadHeader(next_line, &n_reads, &n_refs);
+    alignment_writer::ReadHeader(next_line, n_reads, n_refs);
 
     // Get number of threads
     #pragma omp parallel
@@ -179,7 +175,7 @@ bm::bvector<> ParallelUnpack(std::istream *infile) {
       n_threads = omp_get_num_threads();
     }
 
-    bm::bvector<> pseudoalignment(n_reads*n_refs);
+    bm::bvector<> pseudoalignment((*n_reads)*(*n_refs));
 
     // Read the chunks into `pseudoalignment` in parallel.
     // This loop reads in four chunks at a time using a single thread and then deserializes them in parallel.
