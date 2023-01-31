@@ -9,6 +9,7 @@ pseudoalignment files into/from a compact representation using the
 - C++17 compliant compiler.
 - cmake
 - git
+- OpenMP (optional)
 
 ### How-to
 - Clone the repository, enter the directory and run
@@ -68,40 +69,23 @@ An example packed file with `120000` reads aligned against `8` reference sequenc
 The values before each chunk correspond to the size required to read the chunk in as an `unsigned char` array. 
 
 ## Reading the file format
-Alignment-writer `unpack.cpp` provides functions to read the file
-format. The following C++ code can be incorporated in other projects
-to read the file into memory
-```
-#include <fstream>
-#include <string>
-#include <cstddef>
+Alignment-writer header `unpack.hpp` provides the `Unpack` and
+`ParallelUnpack` functions to read the file format into memory.
 
-#include "unpack.hpp" // Include the alignment-writer unpacking functions
-#include "bm64.h" // BitMagic headers
+### Single-threaded
+Use the `alignment-writer::Unpack` function to read a file using a single thread.
 
-bm::bvector<> ReadPackedAlignment(std::istream *infile) {
-	std::string next_line;
+### Multi-threaded
+The `alignment-writer::ParallelUnpack` function can be used to read a
+file using multiple threads. The parallelization is implemented using
+[OpenMP](https://www.openmp.org/). The caller is responsible for
+setting the number of threads using `omp_set_num_threads(NR_THREADS)`
+before calling `alignment-writer::ParallelUnpack`.
 
-	// Read the number of reads and reference sequences from the first line
-	std::getline(*infile, next_line);
-	size_t n_reads;
-	size_t n_refs;
-	alignment_writer::ReadHeader(next_line, &n_reads, &n_refs);
-
-	// Read the chunks into `pseudoalignment`
-	bm::bvector<> pseudoalignment(n_reads*n_refs);
-	while (std::getline(*infile, next_line)) {
-		size_t next_buffer_size = std::stoul(next_line); // Read the size of the next chunk
-		alignment_writer::DeserializeBuffer(next_buffer_size, infile, &pseudoalignment); // Read the next chunk
-	}
-
-	// Return the `n_reads x n_refs` contiguously stored matrix containing the pseudoalignment.
-	// The pseudoalignment for the `n`th read against the `k`th reference sequence is contained
-	// at position `n*n_refs + k` assuming indexing starts at 0.
-	return pseudoalignment;
-}
-
-```
+Using multiple threads incurs a memory overhead that depends on the
+`--buffer-size` parameter given when packing the alignment. Larger
+buffer sizes result in better multi-thread performance at the cost of
+increased memory consumption.
 
 # License
 alignment-writer is licensed under the [BSD-3-Clause license](https://opensource.org/licenses/BSD-3-Clause). A copy of the license is supplied with the project, or can alternatively be obtained from [https://opensource.org/licenses/BSD-3-Clause](https://opensource.org/licenses/BSD-3-Clause).
