@@ -88,7 +88,7 @@ int main(int argc, char* argv[]) {
     }
 
     if (args.value<bool>('d')) {
-	alignment_writer::UnpackBuffered(in.get(), &std::cout);
+	alignment_writer::Print(in.get(), &std::cout);
     } else {
         alignment_writer::BufferedPack(args.value<size_t>('n'), args.value<size_t>('r'), args.value<size_t>("buffer-size"), in.get(), &std::cout);
     }

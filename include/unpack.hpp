@@ -42,9 +42,9 @@
 #include "bm64.h"
 
 namespace alignment_writer {
-// Read in data that has been written using BufferedPack
-void UnpackBuffered(std::istream *in, std::ostream *out);
-void StreamingUnpackBuffered(std::istream *in, std::ostream *out);
+// Print data that has been written using BufferedPack
+void Print(std::istream *in, std::ostream *out);
+void StreamingPrint(std::istream *in, std::ostream *out);
 
 // Deserialize one section of data written with BufferedPack
 void DeserializeBuffer(const size_t buffer_size, std::istream *in, bm::bvector<> *out);

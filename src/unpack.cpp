@@ -64,7 +64,7 @@ void DeserializeBuffer(const size_t buffer_size, std::istream *in, bm::bvector<>
   delete[] cbuf;
 }
 
-void UnpackBuffered(std::istream *in, std::ostream *out) {
+void Print(std::istream *in, std::ostream *out) {
     // Read size of alignment from the file
     size_t n_reads;
     size_t n_refs;
@@ -99,7 +99,7 @@ void UnpackBuffered(std::istream *in, std::ostream *out) {
     out->flush(); // Flush
 }
 
-void StreamingUnpackBuffered(std::istream *in, std::ostream *out) {
+void StreamingUnpack(std::istream *in, std::ostream *out) {
     // Read size of alignment from the file
     size_t n_reads;
     size_t n_refs;
