@@ -37,8 +37,11 @@
 #include <string>
 #include <cmath>
 #include <sstream>
+#include <exception>
 
 #include "bmserial.h"
+
+#include "alignment-writer_openmp_config.hpp"
 
 namespace alignment_writer {
 void ReadHeader(const std::string &header_line, size_t *n_reads, size_t *n_refs) {
@@ -157,5 +160,69 @@ bm::bvector<> Unpack(std::istream *infile) {
     // The pseudoalignment for the `n`th read against the `k`th reference sequence is contained
     // at position `n*n_refs + k` assuming indexing starts at 0.
     return pseudoalignment;
+}
+
+bm::bvector<> ParallelUnpack(std::istream *infile) {
+#if defined(ALIGNMENTWRITER_OPENMP_SUPPORT) && (ALIGNMENTWRITER_OPENMP_SUPPORT) == 1
+    std::string next_line;
+    size_t n_threads;
+
+    // Read the number of reads and reference sequences from the first line
+    std::getline(*infile, next_line);
+    size_t n_reads;
+    size_t n_refs;
+    alignment_writer::ReadHeader(next_line, &n_reads, &n_refs);
+
+    // Get number of threads
+    #pragma omp parallel
+    {
+      n_threads = omp_get_num_threads();
+    }
+
+    bm::bvector<> pseudoalignment(n_reads*n_refs);
+
+    // Read the chunks into `pseudoalignment` in parallel.
+    // This loop reads in four chunks at a time using a single thread and then deserializes them in parallel.
+    while (std::getline(*infile, next_line)) { // Read size of next block
+        std::vector<std::basic_string<unsigned char>> vals;
+	for (size_t i = 0; i < n_threads && *infile; ++i) {
+	    size_t next_buffer_size = std::stoul(next_line);
+
+	    // Allocate space for the block
+	    char* cbuf = new char[next_buffer_size];
+
+	    // Read the next block into buf
+	    infile->read(cbuf, next_buffer_size);
+
+	    // Store the block in `vals`
+	    unsigned char* buf = reinterpret_cast<unsigned char*>(const_cast<char*>(cbuf));
+	    vals.emplace_back(std::basic_string<unsigned char>(buf, next_buffer_size));
+
+	    delete[] cbuf;
+
+	    // Check if there is more to read
+	    infile->peek();
+	    if (i < n_threads - 1 && *infile) {
+	        // If there is more, get the size of the next buffer.
+	      std::getline(*infile, next_line);
+	    }
+	}
+	// Deserialize the blocks in parallel (reduce by ORring into output variable)
+#pragma omp parallel shared(vals) reduction(bm_bvector_or : pseudoalignment)
+	{
+	    size_t thread_id = omp_get_thread_num();
+	    // If we are at end of file there might be fewer blocks read than there are worker threads
+	    if (thread_id < vals.size()) {
+	        bm::deserialize(pseudoalignment, vals[thread_id].c_str());
+	    }
+	}
+    }
+    // Return the `n_reads x n_refs` contiguously stored matrix containing the pseudoalignment.
+    // The pseudoalignment for the `n`th read against the `k`th reference sequence is contained
+    // at position `n*n_refs + k` assuming indexing starts at 0.
+    return pseudoalignment;
+#else
+    throw std::runtime_error("Error in alignment-writer::ParallelUnpack: Alignment-writer was not compiled with OpenMP support.");
+#endif
 }
 }

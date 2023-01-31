@@ -38,6 +38,7 @@
 #include <cstddef>
 #include <istream>
 #include <ostream>
+#include <vector>
 
 #include "bm64.h"
 
@@ -48,6 +49,8 @@ void StreamingPrint(std::istream *in, std::ostream *out);
 
 // Read in pseudoalignment data written using BufferedPack
 bm::bvector<> Unpack(std::istream *infile);
+// Parallel read
+bm::bvector<> ParallelUnpack(std::istream *infile);
 
 // Deserialize one section of data written with BufferedPack
 void DeserializeBuffer(const size_t buffer_size, std::istream *in, bm::bvector<> *out);
