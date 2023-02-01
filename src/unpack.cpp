@@ -140,6 +140,14 @@ void StreamingUnpack(std::istream *in, std::ostream *out) {
     out->flush(); // Flush
 }
 
+void UnpackData(std::istream *infile, bm::bvector<> *pseudoalignment) {
+    std::string next_line;
+    while (std::getline(*infile, next_line)) {
+        size_t next_buffer_size = std::stoul(next_line); // Read the size of the next chunk
+	alignment_writer::DeserializeBuffer(next_buffer_size, infile, pseudoalignment); // Read the next chunk
+    }
+}
+
 bm::bvector<> Unpack(std::istream *infile, size_t *n_reads, size_t *n_refs) {
     std::string next_line;
 
@@ -149,10 +157,7 @@ bm::bvector<> Unpack(std::istream *infile, size_t *n_reads, size_t *n_refs) {
 
     // Read the chunks into `pseudoalignment`
     bm::bvector<> pseudoalignment((*n_reads)*(*n_refs));
-    while (std::getline(*infile, next_line)) {
-        size_t next_buffer_size = std::stoul(next_line); // Read the size of the next chunk
-	alignment_writer::DeserializeBuffer(next_buffer_size, infile, &pseudoalignment); // Read the next chunk
-    }
+    UnpackData(infile, &pseudoalignment);
 
     // Return the `n_reads x n_refs` contiguously stored matrix containing the pseudoalignment.
     // The pseudoalignment for the `n`th read against the `k`th reference sequence is contained
