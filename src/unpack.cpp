@@ -160,24 +160,17 @@ bm::bvector<> Unpack(std::istream *infile, size_t *n_reads, size_t *n_refs) {
     return pseudoalignment;
 }
 
-bm::bvector<> ParallelUnpack(std::istream *infile, size_t *n_reads, size_t *n_refs) {
+void ParallelUnpackData(std::istream *infile, bm::bvector<> *pseudoalignment) {
+    // Read the chunks into `pseudoalignment` in parallel.
 #if defined(ALIGNMENTWRITER_OPENMP_SUPPORT) && (ALIGNMENTWRITER_OPENMP_SUPPORT) == 1
-    std::string next_line;
-    size_t n_threads;
-
-    // Read the number of reads and reference sequences from the first line
-    std::getline(*infile, next_line);
-    alignment_writer::ReadHeader(next_line, n_reads, n_refs);
-
     // Get number of threads
+    size_t n_threads;
     #pragma omp parallel
     {
       n_threads = omp_get_num_threads();
     }
 
-    bm::bvector<> pseudoalignment((*n_reads)*(*n_refs));
-
-    // Read the chunks into `pseudoalignment` in parallel.
+    std::string next_line;
     // This loop reads in four chunks at a time using a single thread and then deserializes them in parallel.
     while (std::getline(*infile, next_line)) { // Read size of next block
         std::vector<std::basic_string<unsigned char>> vals;
@@ -204,21 +197,38 @@ bm::bvector<> ParallelUnpack(std::istream *infile, size_t *n_reads, size_t *n_re
 	    }
 	}
 	// Deserialize the blocks in parallel (reduce by ORring into output variable)
-#pragma omp parallel shared(vals) reduction(bm_bvector_or : pseudoalignment)
+	bm::bvector<> &out = *pseudoalignment;
+#pragma omp parallel shared(vals) reduction(bm_bvector_or : out)
 	{
 	    size_t thread_id = omp_get_thread_num();
 	    // If we are at end of file there might be fewer blocks read than there are worker threads
 	    if (thread_id < vals.size()) {
-	        bm::deserialize(pseudoalignment, vals[thread_id].c_str());
+	        bm::deserialize(*pseudoalignment, vals[thread_id].c_str());
 	    }
 	}
     }
     // Return the `n_reads x n_refs` contiguously stored matrix containing the pseudoalignment.
     // The pseudoalignment for the `n`th read against the `k`th reference sequence is contained
     // at position `n*n_refs + k` assuming indexing starts at 0.
-    return pseudoalignment;
 #else
     throw std::runtime_error("Error in alignment-writer::ParallelUnpack: Alignment-writer was not compiled with OpenMP support.");
 #endif
+}
+
+bm::bvector<> ParallelUnpack(std::istream *infile, size_t *n_reads, size_t *n_refs) {
+
+    // Read the number of reads and reference sequences from the first line
+    std::string header_line;
+
+    std::getline(*infile, header_line);
+    alignment_writer::ReadHeader(header_line, n_reads, n_refs);
+
+    bm::bvector<> pseudoalignment((*n_reads)*(*n_refs));
+    ParallelUnpackData(infile, &pseudoalignment);
+
+    // Return the `n_reads x n_refs` contiguously stored matrix containing the pseudoalignment.
+    // The pseudoalignment for the `n`th read against the `k`th reference sequence is contained
+    // at position `n*n_refs + k` assuming indexing starts at 0.
+    return pseudoalignment;
 }
 }

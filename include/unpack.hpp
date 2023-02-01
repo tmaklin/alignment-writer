@@ -50,6 +50,7 @@ void StreamingPrint(std::istream *in, std::ostream *out);
 // Read in pseudoalignment data written using BufferedPack
 bm::bvector<> Unpack(std::istream *infile, size_t *n_reads, size_t *n_refs);
 // Parallel read
+void ParallelUnpackData(std::istream *infile, bm::bvector<> *pseudoalignment);
 bm::bvector<> ParallelUnpack(std::istream *infile, size_t *n_reads, size_t *n_refs);
 
 // Deserialize one section of data written with BufferedPack
