@@ -140,11 +140,11 @@ void StreamingUnpack(std::istream *in, std::ostream *out) {
     out->flush(); // Flush
 }
 
-void UnpackData(std::istream *infile, bm::bvector<> *pseudoalignment) {
+void UnpackData(std::istream *infile, bm::bvector<> &pseudoalignment) {
     std::string next_line;
     while (std::getline(*infile, next_line)) {
         size_t next_buffer_size = std::stoul(next_line); // Read the size of the next chunk
-	alignment_writer::DeserializeBuffer(next_buffer_size, infile, pseudoalignment); // Read the next chunk
+	alignment_writer::DeserializeBuffer(next_buffer_size, infile, &pseudoalignment); // Read the next chunk
     }
 }
 
@@ -157,7 +157,7 @@ bm::bvector<> Unpack(std::istream *infile, size_t *n_reads, size_t *n_refs) {
 
     // Read the chunks into `pseudoalignment`
     bm::bvector<> pseudoalignment((*n_reads)*(*n_refs));
-    UnpackData(infile, &pseudoalignment);
+    UnpackData(infile, pseudoalignment);
 
     // Return the `n_reads x n_refs` contiguously stored matrix containing the pseudoalignment.
     // The pseudoalignment for the `n`th read against the `k`th reference sequence is contained
@@ -165,7 +165,7 @@ bm::bvector<> Unpack(std::istream *infile, size_t *n_reads, size_t *n_refs) {
     return pseudoalignment;
 }
 
-void ParallelUnpackData(std::istream *infile, bm::bvector<> *pseudoalignment) {
+void ParallelUnpackData(std::istream *infile, bm::bvector<> &pseudoalignment) {
     // Read the chunks into `pseudoalignment` in parallel.
 #if defined(ALIGNMENTWRITER_OPENMP_SUPPORT) && (ALIGNMENTWRITER_OPENMP_SUPPORT) == 1
     // Get number of threads
@@ -202,13 +202,12 @@ void ParallelUnpackData(std::istream *infile, bm::bvector<> *pseudoalignment) {
 	    }
 	}
 	// Deserialize the blocks in parallel (reduce by ORring into output variable)
-	bm::bvector<> &out = *pseudoalignment;
-#pragma omp parallel shared(vals) reduction(bm_bvector_or : out)
+#pragma omp parallel shared(vals) reduction(bm_bvector_or : pseudoalignment)
 	{
 	    size_t thread_id = omp_get_thread_num();
 	    // If we are at end of file there might be fewer blocks read than there are worker threads
 	    if (thread_id < vals.size()) {
-	        bm::deserialize(*pseudoalignment, vals[thread_id].c_str());
+	        bm::deserialize(pseudoalignment, vals[thread_id].c_str());
 	    }
 	}
     }
@@ -229,7 +228,7 @@ bm::bvector<> ParallelUnpack(std::istream *infile, size_t *n_reads, size_t *n_re
     alignment_writer::ReadHeader(header_line, n_reads, n_refs);
 
     bm::bvector<> pseudoalignment((*n_reads)*(*n_refs));
-    ParallelUnpackData(infile, &pseudoalignment);
+    ParallelUnpackData(infile, pseudoalignment);
 
     // Return the `n_reads x n_refs` contiguously stored matrix containing the pseudoalignment.
     // The pseudoalignment for the `n`th read against the `k`th reference sequence is contained
