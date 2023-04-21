@@ -35,11 +35,21 @@
 #include "pack.hpp"
 
 #include <sstream>
+#include <exception>
 
 #include "bm64.h"
 #include "bmserial.h"
 
 namespace alignment_writer {
+void CheckInput(const size_t n_refs, const size_t n_reads) {
+    size_t num_reads = args.value<size_t>('r');
+    size_t num_refs = args.value<size_t>('n');
+    size_t aln_size = (size_t)(num_reads * num_refs);
+    if (aln_size > (size_t)2^47) {
+	throw std::length_error("Input size exceeds maximum capacity (number of reads x number of references > 2^(48 - 1)).");
+    }
+}
+
 void WriteHeader(const size_t n_refs, const size_t n_reads, std::ostream *out) {
     // Write the header line of the packed format
     *out << n_reads << ',' << n_refs << '\n';
@@ -62,6 +72,7 @@ void WriteBuffer(const bm::bvector<> &bits, bm::serializer<bm::bvector<>> &bvs, 
 void BufferedPack(const size_t n_refs, const size_t n_reads, const size_t &buffer_size, std::istream *in, std::ostream *out) {
     // Buffered read + packing from a stream
     // Write info about the pseudoalignment
+    CheckInput(n_refs, n_reads);
     WriteHeader(n_refs, n_reads, out);
 
     // Next settings provide the lowest size (see BitMagic documentation/examples)
@@ -105,6 +116,7 @@ void BufferedPack(const size_t n_refs, const size_t n_reads, const size_t &buffe
 void Pack(const bm::bvector<> &bits, const size_t n_refs, const size_t n_reads, std::ostream *out) {
     // Pack a pseudoalignment that has been stored in memory
     // Write info about the pseudoalignment
+    CheckInput(n_refs, n_reads);
     WriteHeader(n_refs, n_reads, out);
 
     // Next settings provide the lowest size (see BitMagic documentation/examples)
