@@ -42,9 +42,7 @@
 
 namespace alignment_writer {
 void CheckInput(const size_t n_refs, const size_t n_reads) {
-    size_t num_reads = args.value<size_t>('r');
-    size_t num_refs = args.value<size_t>('n');
-    size_t aln_size = (size_t)(num_reads * num_refs);
+    size_t aln_size = (size_t)(n_reads * n_refs);
     if (aln_size > (size_t)2^47) {
 	throw std::length_error("Input size exceeds maximum capacity (number of reads x number of references > 2^(48 - 1)).");
     }
