@@ -42,11 +42,13 @@
 #include "bm64.h"
 
 namespace alignment_writer {
+enum Format { themisto };
+
 // Pack a pseudoalignment that is already in memory
 void Pack(const bm::bvector<> &bits, const size_t n_refs, const size_t n_reads, std::ostream *out);
 
 // Buffered read of a pseudoalignment from a stream and packing
-void BufferedPack(const size_t n_refs, const size_t n_reads, const size_t &buffer_size, std::istream *in, std::ostream *out);
+void BufferedPack(const Format &format, const size_t n_refs, const size_t n_reads, const size_t &buffer_size, std::istream *in, std::ostream *out);
 }
 
 #endif

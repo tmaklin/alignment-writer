@@ -90,7 +90,7 @@ int main(int argc, char* argv[]) {
     if (args.value<bool>('d')) {
 	alignment_writer::Print(in.get(), &std::cout);
     } else {
-        alignment_writer::BufferedPack(args.value<size_t>('n'), args.value<size_t>('r'), args.value<size_t>("buffer-size"), in.get(), &std::cout);
+        alignment_writer::BufferedPack(alignment_writer::themisto, args.value<size_t>('n'), args.value<size_t>('r'), args.value<size_t>("buffer-size"), in.get(), &std::cout);
     }
     if (args.value<std::string>('f').empty()) {
 	in.release(); // Release ownership of std::cout so we don't try to free it
