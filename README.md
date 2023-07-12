@@ -1,5 +1,6 @@
 # alignment-writer
 Pack/unpack [Themisto](https://github.com/algbio/themisto)
+or [Fulgor](https://github.com/jermp/fulgor)
 pseudoalignment files into/from a compact representation using the
 [BitMagic](https://github.com/tlk00/BitMagic) library.
 
@@ -22,6 +23,10 @@ pseudoalignment files into/from a compact representation using the
 - This will compile the alignment-writer executable in build/bin/.
 
 # Usage
+Default options assume that the alignment is written in the Themisto
+format. Add the `--format fulgor` toggle to read in alignments from
+Fulgor.
+
 ## Read from a file
 All calls print the results to cout.
 
@@ -43,10 +48,22 @@ first column (read_id). This is equivalent to using the
 
 ## Read from cin
 Omitting the `-f` option sets alignment-writer to read input from
-cin. This can be used to pack the output from
-[Themisto](https://github.com/algbio/themisto) without first writing it to disk
+cin. This can be used to pack the output from a pseudoaligner without first writing it to disk
 ```
 themisto pseudoalign -q query_reads.fastq -i index --temp-dir tmp | alignment-writer -n <number of reference sequences> -r <number of reads> > alignment.aln
+```
+
+## More options
+alignment-writer accepts the following flags
+```
+Usage: alignment-writer -f <input-file>
+-f	Pseudoalignment file, packed or unpacked, read from cin if not supplied.
+-d	Unpack pseudoalignment.
+-n	Number of reference sequences in the pseudoalignment (required for packing).
+-r	Number of reads in the pseudoalignment (required for packing).
+--buffer-size	Buffer size for buffered packing (default: 100000
+--format	Input file format (one of `themisto` (default), `fulgor`)
+--help	Print the help message.
 ```
 
 # File format

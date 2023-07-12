@@ -56,6 +56,7 @@ void parse_args(int argc, char* argv[], cxxargs::Arguments &args) {
   args.add_short_argument<size_t>('n', "Number of reference sequences in the pseudoalignment (required for packing).");
   args.add_short_argument<size_t>('r', "Number of reads in the pseudoalignment (required for packing).");
   args.add_long_argument<size_t>("buffer-size", "Buffer size for buffered packing (default: 100000", (size_t)100000);
+  args.add_long_argument<std::string>("format", "Input file format (one of `themisto` (default), `fulgor`)", "themisto");
   if (CmdOptionPresent(argv, argv+argc, "-d")) {
       args.set_not_required('r');
       args.set_not_required('n');
@@ -79,6 +80,15 @@ int main(int argc, char* argv[]) {
 	return 1;
     }
 
+    alignment_writer::Format format;
+    if (args.value<std::string>("format") == "themisto") {
+	format = alignment_writer::themisto;
+    } else if (args.value<std::string>("format") == "fulgor") {
+	format = alignment_writer::fulgor;
+    } else {
+	throw std::runtime_error("Unrecognized input format.");
+    }
+
     std::unique_ptr<std::istream> in;
     if (args.value<std::string>('f').empty()) {
 	in = std::unique_ptr<std::istream>(&std::cin);
@@ -90,7 +100,14 @@ int main(int argc, char* argv[]) {
     if (args.value<bool>('d')) {
 	alignment_writer::Print(in.get(), &std::cout);
     } else {
-        alignment_writer::BufferedPack(args.value<size_t>('n'), args.value<size_t>('r'), args.value<size_t>("buffer-size"), in.get(), &std::cout);
+	try {
+	    alignment_writer::BufferedPack(format, args.value<size_t>('n'), args.value<size_t>('r'), args.value<size_t>("buffer-size"), in.get(), &std::cout);
+	} catch (const std::invalid_argument &e) {
+	    std::cerr << "Reading the alignment failed: " << e.what() << " (is `--format " << args.value<std::string>("format") << "` correct?)" << std::endl;
+	    return 1;
+	} catch (const std::exception &e) {
+	    std::cerr << "Reading the alignment failed: " << e.what() << '.' << std::endl;
+	}
     }
     if (args.value<std::string>('f').empty()) {
 	in.release(); // Release ownership of std::cout so we don't try to free it
