@@ -84,6 +84,21 @@ size_t ThemistoParser(const std::string &line, const size_t n_refs, bm::bvector<
     return n_alignments;
 }
 
+size_t FulgorParser(const std::string &line, const size_t n_refs, bm::bvector<>::bulk_insert_iterator *it, size_t read_id) {
+    // Reads a pseudoalignment line stored in the *Fulgor* format and returns the number of pseudoalignments on the line
+    char separator = '\t';
+    std::stringstream stream(line);
+    std::string part;
+    std::getline(stream, part, separator); // First column is the fragment name
+    std::getline(stream, part, separator); // Second column is the number of alignments
+    size_t n_alignments = std::stoul(part);
+    while(std::getline(stream, part, separator)) {
+	// Buffered insertion to contiguously stored n_reads x n_refs pseudoalignment matrix
+	(*it) = read_id*n_refs + std::stoul(part);
+    }
+    return n_alignments;
+}
+
 void BufferedPack(const Format &format, const size_t n_refs, const size_t n_reads, const size_t &buffer_size, std::istream *in, std::ostream *out) {
     // Buffered read + packing from a stream
     // Write info about the pseudoalignment
@@ -102,6 +117,8 @@ void BufferedPack(const Format &format, const size_t n_refs, const size_t n_read
     std::function<size_t(const std::string &line, const size_t n_refs, bm::bvector<>::bulk_insert_iterator *it, size_t read_id)> parser;
     if (format == themisto) {
 	parser = ThemistoParser;
+    } else if (format == fulgor) {
+	parser = FulgorParser;
     } else {
 	throw std::runtime_error("Unrecognized input format.");
     }
