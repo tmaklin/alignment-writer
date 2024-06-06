@@ -169,6 +169,25 @@ else()
 endif()
 include_directories("${CMAKE_CXXARGS_HEADERS}")
 
+## kseqpp
+if (DEFINED CMAKE_KSEQPP_HEADERS)
+  message(STATUS "kseq++ headers provided in: ${CMAKE_KSEQPP_HEADERS}")
+else()
+  FetchContent_Declare(kseqpp
+    GIT_REPOSITORY    https://github.com/cartoonist/kseqpp
+    GIT_TAG           v1.1.2
+    PREFIX            "external"
+    SOURCE_DIR        "${CMAKE_CURRENT_SOURCE_DIR}/external/kseqpp"
+    BUILD_IN_SOURCE   0
+    BUILD_COMMAND     ""
+    CONFIGURE_COMMAND ""
+    INSTALL_COMMAND   ""
+    )
+  FetchContent_MakeAvailable(kseqpp)
+  set(CMAKE_KSEQPP_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/external/kseqpp/include)
+endif()
+include_directories("${CMAKE_KSEQPP_HEADERS}")
+
 # Link libraries
 if (OPENMP_FOUND)
   target_link_libraries(libalignmentwriter OpenMP::OpenMP_CXX)
