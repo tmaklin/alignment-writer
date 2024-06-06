@@ -68,8 +68,9 @@ void WriteBuffer(const bm::bvector<> &bits, bm::serializer<bm::bvector<>> &bvs, 
     }
 }
 
-size_t ThemistoParser(const std::string &line, const std::unordered_map<std::string, size_t> &query_to_position, const size_t n_refs, bm::bvector<>::bulk_insert_iterator *it, size_t read_id=0) {
+size_t ThemistoParser(const std::string &line, const std::unordered_map<std::string, size_t> &query_to_position, const std::unordered_map<std::string, size_t> &ref_to_position, bm::bvector<>::bulk_insert_iterator *it, size_t read_id=0) {
     // Reads a pseudoalignment line stored in the *Themisto* format and returns the number of pseudoalignments on the line
+    size_t n_refs = ref_to_position.size();
     char separator = ' ';
     std::stringstream stream(line);
     std::string part;
@@ -84,8 +85,9 @@ size_t ThemistoParser(const std::string &line, const std::unordered_map<std::str
     return n_alignments;
 }
 
-size_t FulgorParser(const std::string &line, const std::unordered_map<std::string, size_t> &query_to_position, const size_t n_refs, bm::bvector<>::bulk_insert_iterator *it, size_t read_id) {
+size_t FulgorParser(const std::string &line, const std::unordered_map<std::string, size_t> &query_to_position, const std::unordered_map<std::string, size_t> &ref_to_position, bm::bvector<>::bulk_insert_iterator *it, size_t read_id) {
     // Reads a pseudoalignment line stored in the *Fulgor* format and returns the number of pseudoalignments on the line
+    size_t n_refs = ref_to_position.size();
     char separator = '\t';
     std::stringstream stream(line);
     std::string part;
@@ -101,8 +103,9 @@ size_t FulgorParser(const std::string &line, const std::unordered_map<std::strin
     return n_alignments;
 }
 
-size_t BifrostParser(const std::string &line, const std::unordered_map<std::string, size_t> &query_to_position, const size_t n_refs, bm::bvector<>::bulk_insert_iterator *it, size_t read_id) {
+size_t BifrostParser(const std::string &line, const std::unordered_map<std::string, size_t> &query_to_position, const std::unordered_map<std::string, size_t> &ref_to_position, bm::bvector<>::bulk_insert_iterator *it, size_t read_id) {
     // Reads a pseudoalignment line stored in the *Bifrost* format and returns the number of pseudoalignments on the line
+    size_t n_refs = ref_to_position.size();
     char separator = '\t';
     std::stringstream stream(line);
     std::string part;
@@ -123,10 +126,11 @@ size_t BifrostParser(const std::string &line, const std::unordered_map<std::stri
     return n_alignments;
 }
 
-void BufferedPack(const Format &format, const std::unordered_map<std::string, size_t> &query_to_position, const size_t n_refs, const size_t &buffer_size, std::istream *in, std::ostream *out) {
+void BufferedPack(const Format &format, const std::unordered_map<std::string, size_t> &query_to_position, const std::unordered_map<std::string, size_t> &ref_to_position, const size_t &buffer_size, std::istream *in, std::ostream *out) {
     // Buffered read + packing from a stream
     // Write info about the pseudoalignment
     size_t n_reads = query_to_position.size();
+    size_t n_refs = ref_to_position.size();
     CheckInput(n_refs, n_reads);
     WriteHeader(n_refs, n_reads, out);
 
@@ -139,7 +143,7 @@ void BufferedPack(const Format &format, const std::unordered_map<std::string, si
     bits.set_new_blocks_strat(bm::BM_GAP);
     bm::bvector<>::bulk_insert_iterator it(bits);
 
-    std::function<size_t(const std::string &line, const std::unordered_map<std::string, size_t> &query_to_position, const size_t n_refs, bm::bvector<>::bulk_insert_iterator *it, size_t read_id)> parser;
+    std::function<size_t(const std::string &line, const std::unordered_map<std::string, size_t> &query_to_position, const std::unordered_map<std::string, size_t> &ref_to_position, bm::bvector<>::bulk_insert_iterator *it, size_t read_id)> parser;
     if (format == themisto) {
 	parser = ThemistoParser;
     } else if (format == fulgor) {
@@ -158,7 +162,7 @@ void BufferedPack(const Format &format, const std::unordered_map<std::string, si
     std::string line;
     while (std::getline(*in, line)) {
 	// Parse the line
-	n_in_buffer += parser(line, query_to_position, n_refs, &it, line_number);
+	n_in_buffer += parser(line, query_to_position, ref_to_position, &it, line_number);
 
 	if (n_in_buffer > buffer_size) {
   	    // Force flush on the inserter to ensure everything is saved

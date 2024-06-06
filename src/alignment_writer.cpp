@@ -55,12 +55,12 @@ bool CmdOptionPresent(char **begin, char **end, const std::string &option) {
 void parse_args(int argc, char* argv[], cxxargs::Arguments &args) {
   args.add_short_argument<std::string>('f', "Pseudoalignment file, packed or unpacked, read from cin if not supplied.", "");
   args.add_short_argument<std::string>('r', "Input reads in .fastq(.gz) format (required for packing)");
+  args.add_short_argument<std::string>('l', "List containing reference names (1 per line, required for packing).");
   args.add_short_argument<bool>('d', "Unpack pseudoalignment.", false);
-  args.add_short_argument<size_t>('n', "Number of reference sequences in the pseudoalignment (required for packing).");
   args.add_long_argument<size_t>("buffer-size", "Buffer size for buffered packing (default: 100000", (size_t)100000);
   args.add_long_argument<std::string>("format", "Input file format (one of `themisto` (default), `fulgor`, `bifrost`)", "themisto");
   if (CmdOptionPresent(argv, argv+argc, "-d")) {
-      args.set_not_required('n');
+      args.set_not_required('l');
   }
   args.add_long_argument<bool>("help", "Print the help message.", false);
   if (CmdOptionPresent(argv, argv+argc, "--help")) {
@@ -122,8 +122,27 @@ int main(int argc, char* argv[]) {
 	    return 1;
 	}
 
+	std::unordered_map<std::string, size_t> ref_to_position;
 	try {
-	    alignment_writer::BufferedPack(format, query_to_position, args.value<size_t>('n'), args.value<size_t>("buffer-size"), in.get(), &std::cout);
+	    bxz::ifstream in(args.value<std::string>('l'));
+	    std::string line;
+	    size_t ref_pos = 0;
+	    while (std::getline(in, line)) {
+		ref_to_position.insert(std::make_pair(line, ref_pos));
+		++ref_pos;
+	    }
+	    in.close();
+	} catch (const std::exception &e) {
+	    std::cerr << "Reading from input `-l " << args.value<std::string>('r') << "` failed:" << e.what() << std::endl;
+	}
+
+	if (ref_to_position.size() == 0) {
+	    std::cerr << "Input: `-l " << args.value<std::string>('r') << "` has no lines!" << std::endl;
+	    return 1;
+	}
+
+	try {
+	    alignment_writer::BufferedPack(format, query_to_position, ref_to_position, args.value<size_t>("buffer-size"), in.get(), &std::cout);
 	} catch (const std::invalid_argument &e) {
 	    std::cerr << "Reading the alignment failed: " << e.what() << " (is `--format " << args.value<std::string>("format") << "` correct?)" << std::endl;
 	    return 1;
