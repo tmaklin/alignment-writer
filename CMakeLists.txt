@@ -1,5 +1,6 @@
-cmake_minimum_required (VERSION 2.8.12)
+cmake_minimum_required (VERSION 3.11)
 project (alignment-writer)
+include (FetchContent)
 
 set(LIBRARY_OUTPUT_PATH ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
@@ -40,11 +41,31 @@ else()
 endif()
 
 ## Configure OpenMP if it is supported on the system.
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/config/alignment-writer_openmp_config.hpp.in ${CMAKE_CURRENT_BINARY_DIR}/include/alignment-writer_openmp_config.hpp @ONLY)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/include/alignment-writer_openmp_config.hpp.in ${CMAKE_CURRENT_BINARY_DIR}/include/alignment-writer_openmp_config.hpp @ONLY)
 
 ## Own header files
 set(CMAKE_ALIGNMENT_WRITER_HEADERS ${CMAKE_CURRENT_BINARY_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/include)
 include_directories(${CMAKE_ALIGNMENT_WRITER_HEADERS})
+
+## Get version number from git tags
+find_package(Git)
+if(GIT_FOUND)
+  execute_process(
+    COMMAND ${GIT_EXECUTABLE} describe --tags
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+    OUTPUT_VARIABLE ALIGNMENT_WRITER_BUILD_VERSION
+    ERROR_QUIET
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+  )
+  message( STATUS "alignment-writer version: ${ALIGNMENT_WRITER_BUILD_VERSION}")
+else()
+  message(STATUS "GIT not found, version numbering disabled")
+  set(ALIGNMENT_WRITER_BUILD_VERSION "unknown")
+endif()
+string(TIMESTAMP ALIGNMENT_WRITER_BUILD_TIMESTAMP)
+
+## Generate a version.h file containing build version and timestamp
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/include/version.h.in ${CMAKE_CURRENT_BINARY_DIR}/include/version.h @ONLY)
 
 ## Check supported compression types
 #### zlib
@@ -110,20 +131,22 @@ include_directories(${CMAKE_BITMAGIC_HEADERS})
 if (DEFINED CMAKE_BXZSTR_HEADERS)
   message(STATUS "bxzstr headers provided in: ${CMAKE_BXZSTR_HEADERS}")
 else()
-  configure_file(${CMAKE_CURRENT_SOURCE_DIR}/config/CMakeLists-bxzstr.txt.in ${CMAKE_BINARY_DIR}/external/bxzstr-download/CMakeLists.txt)
-  execute_process(COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
-    RESULT_VARIABLE result
-    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/external/bxzstr-download )
-  if(result)
-    message(FATAL_ERROR "CMake step for bxzstr failed: ${result}")
-  endif()
-  execute_process(COMMAND ${CMAKE_COMMAND} --build .
-    RESULT_VARIABLE result
-    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/external/bxzstr-download )
-  if(result)
-    message(FATAL_ERROR "Build step for bxzstr failed: ${result}")
-  endif()
-  set(CMAKE_BXZSTR_HEADERS ${CMAKE_CURRENT_BINARY_DIR}/external/bxzstr/include)
+  FetchContent_Declare(bxzstr
+    GIT_REPOSITORY    https://github.com/tmaklin/bxzstr.git
+    GIT_TAG           v1.1.0
+    PREFIX            "external"
+    SOURCE_DIR        "${CMAKE_CURRENT_SOURCE_DIR}/external/bxzstr"
+    BUILD_IN_SOURCE   0
+    CMAKE_ARGS        -D ZSTD_FOUND=0
+                      -D ZLIB_FOUND=${ALIGNMENT_WRITER_HAVE_ZLIB}
+		      -D BZIP2_FOUND=${ALIGNMENT_WRITER_HAVE_BZIP2}
+		      -D LIBLZMA_FOUND=${ALIGNMENT_WRITER_HAVE_LIBLZMA}
+    BUILD_COMMAND     ""
+    CONFIGURE_COMMAND ""
+    INSTALL_COMMAND   ""
+    )
+  FetchContent_MakeAvailable(bxzstr)
+  set(CMAKE_BXZSTR_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/external/bxzstr/include)
 endif()
 include_directories(${CMAKE_BXZSTR_HEADERS})
 
@@ -131,45 +154,20 @@ include_directories(${CMAKE_BXZSTR_HEADERS})
 if (DEFINED CMAKE_CXXARGS_HEADERS)
   message(STATUS "cxxargs headers provided in: ${CMAKE_CXXARGS_HEADERS}")
 else()
-  configure_file(${CMAKE_CURRENT_SOURCE_DIR}/config/CMakeLists-cxxargs.txt.in ${CMAKE_BINARY_DIR}/external/cxxargs-download/CMakeLists.txt)
-  execute_process(COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
-    RESULT_VARIABLE result
-    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/external/cxxargs-download )
-  if(result)
-    message(FATAL_ERROR "CMake step for cxxargs failed: ${result}")
-  endif()
-  execute_process(COMMAND ${CMAKE_COMMAND} --build .
-    RESULT_VARIABLE result
-    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/external/cxxargs-download )
-  if(result)
-    message(FATAL_ERROR "Build step for cxxargs failed: ${result}")
-  endif()
-  set(CMAKE_CXXARGS_HEADERS ${CMAKE_CURRENT_BINARY_DIR}/external/cxxargs/include)
+  FetchContent_Declare(cxxargs
+    GIT_REPOSITORY    https://github.com/tmaklin/cxxargs.git
+    GIT_TAG           v1.1.4
+    PREFIX            "external"
+    SOURCE_DIR        "${CMAKE_CURRENT_SOURCE_DIR}/external/cxxargs"
+    BUILD_IN_SOURCE   0
+    BUILD_COMMAND     ""
+    CONFIGURE_COMMAND ""
+    INSTALL_COMMAND   ""
+    )
+  FetchContent_MakeAvailable(cxxargs)
+  set(CMAKE_CXXARGS_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/external/cxxargs/include)
 endif()
-include_directories(${CMAKE_CXXARGS_HEADERS})
-
-## Include project headers
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
-
-## Get version number from git tags
-find_package(Git)
-if(GIT_FOUND)
-  execute_process(
-    COMMAND ${GIT_EXECUTABLE} describe --tags
-    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
-    OUTPUT_VARIABLE ALIGNMENT_WRITER_BUILD_VERSION
-    ERROR_QUIET
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-  )
-  message( STATUS "alignment-writer version: ${ALIGNMENT_WRITER_BUILD_VERSION}")
-else()
-  message(STATUS "GIT not found, version numbering disabled")
-  set(ALIGNMENT_WRITER_BUILD_VERSION "unknown")
-endif()
-string(TIMESTAMP ALIGNMENT_WRITER_BUILD_TIMESTAMP)
-
-## Generate a version.h file containing build version and timestamp
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/config/version.h.in ${CMAKE_CURRENT_BINARY_DIR}/include/version.h @ONLY)
+include_directories("${CMAKE_CXXARGS_HEADERS}")
 
 # Link libraries
 if (OPENMP_FOUND)
