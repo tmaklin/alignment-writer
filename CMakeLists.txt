@@ -123,9 +123,13 @@ else()
 endif()
 
 ## Check dependencies and download them if not found
-## BitMagic - supplied with the project
+### BitMagic - supplied with the project
 set(CMAKE_BITMAGIC_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/external/BitMagic-7.12.3/src)
 include_directories(${CMAKE_BITMAGIC_HEADERS})
+
+### kseq++
+set(CMAKE_KSEQPP_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/external/kseqpp-1.1.2/include)
+include_directories(${CMAKE_KSEQPP_HEADERS})
 
 ## bxzstr
 if (DEFINED CMAKE_BXZSTR_HEADERS)
@@ -168,25 +172,6 @@ else()
   set(CMAKE_CXXARGS_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/external/cxxargs/include)
 endif()
 include_directories("${CMAKE_CXXARGS_HEADERS}")
-
-## kseqpp
-if (DEFINED CMAKE_KSEQPP_HEADERS)
-  message(STATUS "kseq++ headers provided in: ${CMAKE_KSEQPP_HEADERS}")
-else()
-  FetchContent_Declare(kseqpp
-    GIT_REPOSITORY    https://github.com/cartoonist/kseqpp
-    GIT_TAG           v1.1.2
-    PREFIX            "external"
-    SOURCE_DIR        "${CMAKE_CURRENT_SOURCE_DIR}/external/kseqpp"
-    BUILD_IN_SOURCE   0
-    BUILD_COMMAND     ""
-    CONFIGURE_COMMAND ""
-    INSTALL_COMMAND   ""
-    )
-  FetchContent_MakeAvailable(kseqpp)
-  set(CMAKE_KSEQPP_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/external/kseqpp/include)
-endif()
-include_directories("${CMAKE_KSEQPP_HEADERS}")
 
 # Link libraries
 if (OPENMP_FOUND)
