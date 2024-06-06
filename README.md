@@ -62,7 +62,7 @@ Usage: alignment-writer -f <input-file>
 -l	List containing reference names (1 per line, required for packing).
 -d	Unpack pseudoalignment.
 --buffer-size	Buffer size for buffered packing (default: 100000
---format	Input file format (one of `themisto` (default), `fulgor`)
+--format	Input file format (one of `themisto` (default), `fulgor`, `bifrost`, `metagraph`)
 --help	Print the help message.
 ```
 

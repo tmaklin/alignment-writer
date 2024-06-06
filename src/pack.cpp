@@ -126,6 +126,30 @@ size_t BifrostParser(const std::string &line, const std::unordered_map<std::stri
     return n_alignments;
 }
 
+size_t MetagraphParser(const std::string &line, const std::unordered_map<std::string, size_t> &query_to_position, const std::unordered_map<std::string, size_t> &ref_to_position, bm::bvector<>::bulk_insert_iterator *it, size_t read_id) {
+    // Reads a pseudoalignment line stored in the *Bifrost* format and returns the number of pseudoalignments on the line
+    size_t n_refs = ref_to_position.size();
+    char separator = '\t';
+    std::stringstream stream(line);
+    std::string part;
+    std::getline(stream, part, separator); // first column is the read position in input
+    std::string query_name;
+    std::getline(stream, query_name, separator); // second column is the fragment name
+    read_id = query_to_position.at(query_name);
+    size_t n_alignments = 0;
+    std::getline(stream, part, separator); // Third column contains `:` separated alignments
+    separator = ':';
+    std::stringstream alns(part);
+    std::string ref_name;
+    while(std::getline(alns, ref_name, separator)) {
+	// Buffered insertion to contiguously stored n_reads x n_refs pseudoalignment matrix
+	size_t ref_id = ref_to_position.at(ref_name);
+	(*it) = read_id*n_refs + ref_id;
+	++n_alignments;
+    }
+    return n_alignments;
+}
+
 void BufferedPack(const Format &format, const std::unordered_map<std::string, size_t> &query_to_position, const std::unordered_map<std::string, size_t> &ref_to_position, const size_t &buffer_size, std::istream *in, std::ostream *out) {
     // Buffered read + packing from a stream
     // Write info about the pseudoalignment
@@ -153,6 +177,8 @@ void BufferedPack(const Format &format, const std::unordered_map<std::string, si
 	std::string header;
 	std::getline(*in, header);
 	parser = BifrostParser;
+    } else if (format == metagraph) {
+	parser = MetagraphParser;
     } else {
 	throw std::runtime_error("Unrecognized input format.");
     }
