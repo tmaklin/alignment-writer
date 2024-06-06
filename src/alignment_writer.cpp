@@ -60,6 +60,7 @@ void parse_args(int argc, char* argv[], cxxargs::Arguments &args) {
   args.add_long_argument<size_t>("buffer-size", "Buffer size for buffered packing (default: 100000", (size_t)100000);
   args.add_long_argument<std::string>("format", "Input file format (one of `themisto` (default), `fulgor`, `bifrost`)", "themisto");
   if (CmdOptionPresent(argv, argv+argc, "-d")) {
+      args.set_not_required('r');
       args.set_not_required('l');
   }
   args.add_long_argument<bool>("help", "Print the help message.", false);
