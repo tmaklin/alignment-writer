@@ -14,7 +14,7 @@ jobs:
       - name: Install wget
         id: install-wget
         run: |
-	  yum install -y wget
+         yum install -y wget
 
       - name: Create io directories
         id: mkdir-io
