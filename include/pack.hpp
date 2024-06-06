@@ -38,6 +38,7 @@
 #include <cstddef>
 #include <istream>
 #include <ostream>
+#include <unordered_map>
 
 #include "bm64.h"
 
@@ -48,7 +49,7 @@ enum Format { themisto, fulgor, bifrost };
 void Pack(const bm::bvector<> &bits, const size_t n_refs, const size_t n_reads, std::ostream *out);
 
 // Buffered read of a pseudoalignment from a stream and packing
-void BufferedPack(const Format &format, const size_t n_refs, const size_t n_reads, const size_t &buffer_size, std::istream *in, std::ostream *out);
+void BufferedPack(const Format &format, const std::unordered_map<std::string, size_t> &query_to_position, const size_t n_refs, const size_t &buffer_size, std::istream *in, std::ostream *out);
 }
 
 #endif
