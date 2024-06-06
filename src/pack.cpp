@@ -99,6 +99,26 @@ size_t FulgorParser(const std::string &line, const size_t n_refs, bm::bvector<>:
     return n_alignments;
 }
 
+size_t BifrostParser(const std::string &line, const size_t n_refs, bm::bvector<>::bulk_insert_iterator *it, size_t read_id) {
+    // Reads a pseudoalignment line stored in the *Bifrost* format and returns the number of pseudoalignments on the line
+    char separator = '\t';
+    std::stringstream stream(line);
+    std::string part;
+    std::getline(stream, part, separator); // First column is the fragment name
+    size_t n_alignments = 0;
+    size_t ref_id = 0;
+    while(std::getline(stream, part, separator)) {
+	// Buffered insertion to contiguously stored n_reads x n_refs pseudoalignment matrix
+	bool aligned = std::stoul(part) == 1;
+	if (aligned) {
+	    (*it) = read_id*n_refs + ref_id;
+	    ++n_alignments;
+	}
+	++ref_id;
+    }
+    return n_alignments;
+}
+
 void BufferedPack(const Format &format, const size_t n_refs, const size_t n_reads, const size_t &buffer_size, std::istream *in, std::ostream *out) {
     // Buffered read + packing from a stream
     // Write info about the pseudoalignment
@@ -119,6 +139,11 @@ void BufferedPack(const Format &format, const size_t n_refs, const size_t n_read
 	parser = ThemistoParser;
     } else if (format == fulgor) {
 	parser = FulgorParser;
+    } else if (format == bifrost) {
+	// Consume first line in Bifrost format (contains ref names)
+	std::string header;
+	std::getline(*in, header);
+	parser = BifrostParser;
     } else {
 	throw std::runtime_error("Unrecognized input format.");
     }
