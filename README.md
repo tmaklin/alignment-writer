@@ -14,6 +14,7 @@ Download prebuilt binaries for
 - Linux x86_64
 - macOS arm64
 - macOS x86_64
+
 from the [Releases page](https://github.com/tmaklin/alignment-writer/releases).
 
 ### Compiling from source
