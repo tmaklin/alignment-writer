@@ -42,7 +42,7 @@
 #include "bm64.h"
 
 namespace alignment_writer {
-enum Format { themisto, fulgor };
+enum Format { themisto, fulgor, bifrost };
 
 // Pack a pseudoalignment that is already in memory
 void Pack(const bm::bvector<> &bits, const size_t n_refs, const size_t n_reads, std::ostream *out);
