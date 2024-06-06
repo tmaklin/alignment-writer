@@ -59,8 +59,8 @@ alignment-writer accepts the following flags
 Usage: alignment-writer -f <input-file>
 -f	Pseudoalignment file, packed or unpacked, read from cin if not supplied.
 -r	Input reads in .fastq(.gz) format (required for packing).
+-l	List containing reference names (1 per line, required for packing).
 -d	Unpack pseudoalignment.
--n	Number of reference sequences in the pseudoalignment (required for packing).
 --buffer-size	Buffer size for buffered packing (default: 100000
 --format	Input file format (one of `themisto` (default), `fulgor`)
 --help	Print the help message.
