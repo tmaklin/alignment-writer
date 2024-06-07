@@ -47,6 +47,7 @@
 #include "version.h"
 #include "unpack.hpp"
 #include "pack.hpp"
+#include "parser.hpp"
 
 bool CmdOptionPresent(char **begin, char **end, const std::string &option) {
   return (std::find(begin, end, option) != end);
