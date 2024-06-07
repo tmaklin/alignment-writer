@@ -150,6 +150,35 @@ size_t MetagraphParser(const std::string &line, const std::unordered_map<std::st
     return n_alignments;
 }
 
+size_t SAMParser(const std::string &line, const std::unordered_map<std::string, size_t> &query_to_position, const std::unordered_map<std::string, size_t> &ref_to_position, bm::bvector<>::bulk_insert_iterator *it, size_t read_id) {
+    // Reads a pseudoalignment line stored in the *Bifrost* format and returns the number of pseudoalignments on the line
+    size_t n_refs = ref_to_position.size();
+    char separator = '\t';
+    std::stringstream stream(line);
+    std::string part;
+
+    // First column is query name
+    std::string query_name;
+    std::getline(stream, query_name, separator);
+    read_id = query_to_position.at(query_name);
+
+    // Second column contains the sam bitwise flags
+    std::getline(stream, part, separator);
+
+    // Third column contains the reference name
+    std::string ref_name;
+    std::getline(stream, ref_name, separator);
+    if (ref_name == "*") {
+	// Unmapped
+	return 0;
+    }
+    size_t ref_id = ref_to_position.at(ref_name);
+
+    (*it) = read_id*n_refs + ref_id;
+
+    return 1;
+}
+
 void BufferedPack(const Format &format, const std::unordered_map<std::string, size_t> &query_to_position, const std::unordered_map<std::string, size_t> &ref_to_position, const size_t &buffer_size, std::istream *in, std::ostream *out) {
     // Buffered read + packing from a stream
     // Write info about the pseudoalignment
@@ -179,6 +208,13 @@ void BufferedPack(const Format &format, const std::unordered_map<std::string, si
 	parser = BifrostParser;
     } else if (format == metagraph) {
 	parser = MetagraphParser;
+    } else if (format == sam) {
+	// Consume the header lines from the SAM format
+	std::string header;
+	while (in->peek() == '@') {
+	    std::getline(*in, header);
+	}
+	parser = SAMParser;
     } else {
 	throw std::runtime_error("Unrecognized input format.");
     }

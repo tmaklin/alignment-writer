@@ -58,7 +58,7 @@ void parse_args(int argc, char* argv[], cxxargs::Arguments &args) {
   args.add_short_argument<std::string>('l', "List containing reference names (1 per line, required for packing).");
   args.add_short_argument<bool>('d', "Unpack pseudoalignment.", false);
   args.add_long_argument<size_t>("buffer-size", "Buffer size for buffered packing (default: 100000", (size_t)100000);
-  args.add_long_argument<std::string>("format", "Input file format (one of `themisto` (default), `fulgor`, `bifrost`)", "metagraph");
+  args.add_long_argument<std::string>("format", "Input file format (one of `themisto` (default), `fulgor`, `bifrost` `metagraph`, `sam`)", "themisto");
   if (CmdOptionPresent(argv, argv+argc, "-d")) {
       args.set_not_required('r');
       args.set_not_required('l');
@@ -91,6 +91,8 @@ int main(int argc, char* argv[]) {
 	format = alignment_writer::bifrost;
     } else if (args.value<std::string>("format") == "metagraph") {
 	format = alignment_writer::metagraph;
+    } else if (args.value<std::string>("format") == "sam") {
+	format = alignment_writer::sam;
     } else {
 	throw std::runtime_error("Unrecognized input format.");
     }

@@ -8,6 +8,8 @@ Supported pseudoaligners:
 - [Bifrost](https://github.com/pmelsted/bifrost)
 - [Metagraph](https://github.com/ratschlab/metagraph)
 
+Converting .sam files produced by other tools is also supported.
+
 ## Installation
 ### Prebuilt binaries
 Download prebuilt binaries for
@@ -37,7 +39,8 @@ This will compile the alignment-writer executable in build/bin/.
 ## Usage
 Default options assume that the alignment is written in the Themisto
 format. Add the `--format fulgor`, `--format bifrost`, `--format metagraph`
-toggle to read in alignments from other pseudoaligners.
+toggle to read in alignments from other pseudoaligners, or `--format sam` to
+read alignments from a .sam file.
 
 ### Read from a file
 #### Pack an alignment
@@ -75,7 +78,7 @@ Usage: alignment-writer -f <input-file>
 -l	List containing reference names (1 per line, required for packing).
 -d	Unpack pseudoalignment.
 --buffer-size	Buffer size for buffered packing (default: 100000
---format	Input file format (one of `themisto` (default), `fulgor`, `bifrost`, `metagraph`)
+--format	Input file format (one of `themisto` (default), `fulgor`, `bifrost`, `metagraph`, `sam`)
 --help	Print the help message.
 ```
 
