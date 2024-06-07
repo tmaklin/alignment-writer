@@ -58,7 +58,7 @@ void parse_args(int argc, char* argv[], cxxargs::Arguments &args) {
   args.add_short_argument<std::string>('l', "List containing reference names (1 per line, required for packing).");
   args.add_short_argument<bool>('d', "Unpack pseudoalignment.", false);
   args.add_long_argument<size_t>("buffer-size", "Buffer size for buffered packing (default: 100000", (size_t)100000);
-  args.add_long_argument<std::string>("format", "Input file format (one of `themisto` (default), `fulgor`, `bifrost`)", "metagraph");
+  args.add_long_argument<std::string>("format", "Input file format (one of `themisto` (default), `fulgor`, `bifrost`, `metagraph`)", "themisto");
   if (CmdOptionPresent(argv, argv+argc, "-d")) {
       args.set_not_required('r');
       args.set_not_required('l');
