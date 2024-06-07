@@ -128,3 +128,4 @@ alignment-writer is licensed under the [BSD-3-Clause license](https://opensource
 - [bxzstr](https://github.com/tmaklin/bxzstr) is licensed under the [MPL-2.0 license](https://opensource.org/licenses/MPL-2.0).
 - [cxxargs](https://github.com/tmaklin/cxxargs) is licensed under the [MPL-2.0 license](https://opensource.org/licenses/MPL-2.0).
 - [kseq++](https://github.com/cartoonist/kseqpp) is licensed under the [MIT license](https://opensource.org/licenses/MIT).
+- [JSON for Modern C++](https://github.com/nlohmann/json) is licensed under the [MIT license](https://opensource.org/licenses/MIT).
