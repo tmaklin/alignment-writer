@@ -85,7 +85,7 @@ void BufferedPack(const Format &format, const std::unordered_map<std::string, si
     bits.set_new_blocks_strat(bm::BM_GAP);
     bm::bvector<>::bulk_insert_iterator it(bits);
 
-    std::function<size_t(const std::string &line, const std::unordered_map<std::string, size_t> &query_to_position, const std::unordered_map<std::string, size_t> &ref_to_position, bm::bvector<>::bulk_insert_iterator *it, size_t read_id)> parser;
+    std::function<size_t(const std::string &line, const std::unordered_map<std::string, size_t> &query_to_position, const std::unordered_map<std::string, size_t> &ref_to_position, bm::bvector<>::bulk_insert_iterator *it)> parser;
     if (format == themisto) {
 	parser = ThemistoParser;
     } else if (format == fulgor) {
@@ -108,12 +108,11 @@ void BufferedPack(const Format &format, const std::unordered_map<std::string, si
 	throw std::runtime_error("Unrecognized input format.");
     }
 
-    size_t line_number = 0;
     size_t n_in_buffer = 0;
     std::string line;
     while (std::getline(*in, line)) {
 	// Parse the line
-	n_in_buffer += parser(line, query_to_position, ref_to_position, &it, line_number);
+	n_in_buffer += parser(line, query_to_position, ref_to_position, &it);
 
 	if (n_in_buffer > buffer_size) {
   	    // Force flush on the inserter to ensure everything is saved
@@ -124,7 +123,6 @@ void BufferedPack(const Format &format, const std::unordered_map<std::string, si
 	    bits.set_new_blocks_strat(bm::BM_GAP);
 	    n_in_buffer = 0;
 	}
-	++line_number;
     }
 
     // Write the remaining bits
