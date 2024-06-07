@@ -34,12 +34,15 @@
 //
 #include "pack.hpp"
 
+#include <lzma.h>
+
 #include <sstream>
 #include <exception>
 #include <functional>
 
 #include "bm64.h"
 #include "bmserial.h"
+#include "bxzstr.hpp"
 
 namespace alignment_writer {
 void CheckInput(const size_t n_refs, const size_t n_reads) {
@@ -49,9 +52,35 @@ void CheckInput(const size_t n_refs, const size_t n_reads) {
     }
 }
 
-void WriteHeader(const size_t n_refs, const size_t n_reads, std::ostream *out) {
+void WriteHeader(const std::unordered_map<std::string, size_t> &query_to_position,
+		 const std::unordered_map<std::string, size_t> &ref_to_position,
+		 std::ostream *out) {
     // Write the header line of the packed format
-    *out << n_reads << ',' << n_refs << '\n';
+    size_t n_reads = query_to_position.size();
+    size_t n_refs = ref_to_position.size();
+
+    std::stringbuf buf;
+    bxz::ostream lzma(&buf, bxz::lzma, 1);
+    lzma << "{";
+    lzma << "\"n_queries\":" << n_reads << ',' << "\"n_targets\":" << n_refs;
+    lzma << ',';
+    lzma << "\"targets\":[";
+    size_t n_written = 0;
+    for (auto kv : ref_to_position) {
+	lzma << "{\"target\":\"" << kv.first << '"' << ',' << "\"pos\":" << kv.second << '}'<< ((n_written == n_refs - 1) ? ']' : ',');
+	++n_written;
+    }
+    lzma << ',' << "\"queries\":[";
+    n_written = 0;
+    for (auto kv : query_to_position) {
+	lzma << "{\"query\":\"" << kv.first << '"' << ',' << "\"pos\":" << kv.second << '}'<< ((n_written == n_reads - 1) ? ']' : ',');
+	++n_written;
+    }
+    lzma << '}';
+    lzma.flush();
+    *out << buf.str().size() << '\n';
+    *out << buf.str();
+    out->flush();
 }
 
 void WriteBuffer(const bm::bvector<> &bits, bm::serializer<bm::bvector<>> &bvs, std::ostream *out) {
@@ -74,7 +103,7 @@ void BufferedPack(const Format &format, const std::unordered_map<std::string, si
     size_t n_reads = query_to_position.size();
     size_t n_refs = ref_to_position.size();
     CheckInput(n_refs, n_reads);
-    WriteHeader(n_refs, n_reads, out);
+    WriteHeader(query_to_position, ref_to_position, out);
 
     // Next settings provide the lowest size (see BitMagic documentation/examples)
     bm::serializer<bm::bvector<>> bvs;
@@ -135,7 +164,7 @@ void Pack(const bm::bvector<> &bits, const size_t n_refs, const size_t n_reads, 
     // Pack a pseudoalignment that has been stored in memory
     // Write info about the pseudoalignment
     CheckInput(n_refs, n_reads);
-    WriteHeader(n_refs, n_reads, out);
+    // WriteHeader(n_refs, n_reads, out);
 
     // Next settings provide the lowest size (see BitMagic documentation/examples)
     bm::serializer<bm::bvector<>> bvs;

@@ -38,19 +38,29 @@
 #include <cmath>
 #include <sstream>
 #include <exception>
+#include <iostream>
 
+#include "nlohmann/json.hpp"
 #include "bmserial.h"
+#include "bxzstr.hpp"
 
 #include "alignment-writer_openmp_config.hpp"
 
 namespace alignment_writer {
-void ReadHeader(const std::string &header_line, size_t *n_reads, size_t *n_refs) {
-    std::stringstream header(header_line);
-    std::string line;
-    std::getline(header, line, ',');
-    (*n_reads) = std::stoul(line); // First value is number of reads
-    std::getline(header, line, ',');
-    (*n_refs) = std::stoul(line); // Second value is number of references
+void ReadHeader(std::istream *in, size_t *n_reads, size_t *n_refs) {
+    std::string first_line;
+    std::getline(*in, first_line);
+    size_t buffer_size = std::stoul(first_line);
+
+    std::stringbuf buffer;
+    for (size_t i = 0; i < buffer_size; ++i) {
+	buffer.sputc(in->get());
+    }
+
+    bxz::istream instr(&buffer);
+    nlohmann::json_abi_v3_11_3::json header = nlohmann::json_abi_v3_11_3::json::parse(instr);
+    *n_reads = header["n_queries"];
+    *n_refs = header["n_targets"];
 }
 
 void DeserializeBuffer(const size_t buffer_size, std::istream *in, bm::bvector<> *out) {
@@ -71,13 +81,12 @@ void Print(std::istream *in, std::ostream *out) {
     // Read size of alignment from the file
     size_t n_reads;
     size_t n_refs;
-    std::string line;
-    std::getline(*in, line);
-    ReadHeader(line, &n_reads, &n_refs);
+    ReadHeader(in, &n_reads, &n_refs);
 
     // Deserialize the buffer
     bm::bvector<> bits(n_reads*n_refs, bm::BM_GAP);
 
+    std::string line;
     while (std::getline(*in, line)) { // Read size of next block
 	size_t next_buffer_size = std::stoul(line);
 	DeserializeBuffer(next_buffer_size, in, &bits);
@@ -106,10 +115,9 @@ void StreamingUnpack(std::istream *in, std::ostream *out) {
     // Read size of alignment from the file
     size_t n_reads;
     size_t n_refs;
-    std::string line;
-    std::getline(*in, line);
-    ReadHeader(line, &n_reads, &n_refs);
+    ReadHeader(in, &n_reads, &n_refs);
 
+    std::string line;
     while (std::getline(*in, line)) { // Read size of next block
 	bm::bvector<> bits;
 	size_t next_buffer_size = std::stoul(line);
@@ -152,8 +160,7 @@ bm::bvector<> Unpack(std::istream *infile, size_t *n_reads, size_t *n_refs) {
     std::string next_line;
 
     // Read the number of reads and reference sequences from the first line
-    std::getline(*infile, next_line);
-    alignment_writer::ReadHeader(next_line, n_reads, n_refs);
+    alignment_writer::ReadHeader(infile, n_reads, n_refs);
 
     // Read the chunks into `pseudoalignment`
     bm::bvector<> pseudoalignment((*n_reads)*(*n_refs));
@@ -224,8 +231,7 @@ bm::bvector<> ParallelUnpack(std::istream *infile, size_t *n_reads, size_t *n_re
     // Read the number of reads and reference sequences from the first line
     std::string header_line;
 
-    std::getline(*infile, header_line);
-    alignment_writer::ReadHeader(header_line, n_reads, n_refs);
+    alignment_writer::ReadHeader(infile, n_reads, n_refs);
 
     bm::bvector<> pseudoalignment((*n_reads)*(*n_refs));
     ParallelUnpackData(infile, pseudoalignment);

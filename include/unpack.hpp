@@ -58,7 +58,7 @@ bm::bvector<> ParallelUnpack(std::istream *infile, size_t *n_reads, size_t *n_re
 void DeserializeBuffer(const size_t buffer_size, std::istream *in, bm::bvector<> *out);
 
 // Function for reading the header line of the alignment file
-void ReadHeader(const std::string &header_line, size_t *n_reads, size_t *n_refs);
+    void ReadHeader(std::istream *in, size_t *n_reads, size_t *n_refs);
 }
 
 #endif

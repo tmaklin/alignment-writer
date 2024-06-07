@@ -112,7 +112,7 @@ if (DEFINED LIBLZMA_LIBRARY AND DEFINED LIBLZMA_INCLUDE_DIR AND (NOT DEFINED LIB
   target_link_libraries(alignment-writer ${LIBLZMA_LIBRARY})
   set(ALIGNMENT_WRITER_HAVE_LIBLZMA 1)
 else()
-  find_package(LibLZMA)
+  find_package(LibLZMA REQUIRED)
   if (LIBLZMA_FOUND)
     include_directories(${LIBLZMA_INCLUDE_DIR})
     target_link_libraries(alignment-writer ${LIBLZMA_LIBRARY})
@@ -130,6 +130,10 @@ include_directories(${CMAKE_BITMAGIC_HEADERS})
 ### kseq++
 set(CMAKE_KSEQPP_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/external/kseqpp-1.1.2/include)
 include_directories(${CMAKE_KSEQPP_HEADERS})
+
+### json
+set(CMAKE_JSON_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/external/json-3.11.3/single_include)
+include_directories(${CMAKE_JSON_HEADERS})
 
 ## bxzstr
 if (DEFINED CMAKE_BXZSTR_HEADERS)
