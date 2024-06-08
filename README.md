@@ -45,42 +45,46 @@ read alignments from a .sam file.
 
 ### Read from a file
 #### Pack an alignment
-All calls print the results to cout.
-
-Pack a themisto pseudoalignment file `alignment.txt.gz` created from aligning the reads `reads.fastq.gz` against a Themisto index constructed from the assemblies listed in `target_assemblies_list.txt`
+Pack a themisto pseudoalignment file `alignment.txt` created from aligning the reads `reads.fastq.gz` against a Themisto index constructed from the assemblies listed in `target_assemblies_list.txt`
 ```
-alignment-writer -f alignment.txt.gz -l target_assemblies_list.txt -r reads.fastq.gz > alignment.aln
+alignment-writer -l target_assemblies_list.txt -r reads.fastq.gz alignment.txt
 ```
-This writes the packed results to `alignment.aln`
+This writes the packed results to `alignment.txt.aln`
 
 #### Unpack an alignment
-Unpack the packed alignment `alignment.aln` with the `-d` toggle
+Unpack the packed alignment `alignment.txt.aln` with the `-d` toggle
 ```
-alignment-writer -d -f alignment.aln > alignment.tsv
+alignment-writer -d alignment.txt.aln
 ```
-The produced `alignment.tsv` file will contain the pseudoalignments
-from the original `alignment.txt.gz` file sorted according to the
+The produced `alignment.txt` file will contain the pseudoalignments
+from the original `alignment.txt` file sorted according to the
 order they occur in the `reads.fastq.gz` file. This is equivalent to using the
 `--sort-output` toggle when running themisto.
 
-### Read from cin
-Omitting the `-f` option sets alignment-writer to read input from
-cin. This can be used to pack the output from a pseudoaligner without first writing it to disk
+### Read from terminal
+Omitting the positional argument `alignment.txt` option sets alignment-writer to read input from
+terminal. This can be used to pack the output from a pseudoaligner without first writing it to disk
 ```
-themisto pseudoalign -q query_reads.fastq -i index --temp-dir tmp | alignment-writer -f alignment.txt.gz -l target_assemblies_list.txt -r query_reads.fastq > alignment.aln
+themisto pseudoalign -q query_reads.fastq -i index --temp-dir tmp | alignment-writer -l target_assemblies_list.txt -r query_reads.fastq > alignment.txt.aln
 ```
 
 ### More options
 alignment-writer accepts the following flags
 ```
-Usage: alignment-writer -f <input-file>
--f	Pseudoalignment file, packed or unpacked, read from cin if not supplied.
--r	Input reads in .fastq(.gz) format (required for packing).
--l	List containing reference names (1 per line, required for packing).
--d	Unpack pseudoalignment.
---buffer-size	Buffer size for buffered packing (default: 100000
---format	Input file format (one of `themisto` (default), `fulgor`, `bifrost`, `metagraph`, `sam`)
---help	Print the help message.
+  alignment-writer [options] [files]
+
+  -z, --compress         Compress file(s).
+  -d, --decompress       Decompress file(s).
+  -r, --reads arg        Reads used in the input alignment.
+  -l, --target-list arg  File listing the input alignment targets.
+      --format arg       Input/output format (default: themisto)
+  -k, --keep             Keep input file(s) instead of deleting.
+  -f, --force            Force overwrite output file(s).
+  -c, --stdout           Write to standard out, keep files.
+  -T, --threads arg      Use `arg` threads, 0 = all available. (default: 1)
+  -b, --buffer-size arg  Buffer writes every `arg` hits. (default: 256000)
+  -h, --help             Print this message and quit.
+  -V, --version          Print the version and quit.
 ```
 
 ## File format
