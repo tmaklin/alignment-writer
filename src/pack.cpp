@@ -39,6 +39,7 @@
 #include <sstream>
 #include <exception>
 #include <functional>
+#include <unordered_set>
 
 #include "bm64.h"
 #include "bmserial.h"
@@ -78,7 +79,7 @@ void WriteHeader(const std::unordered_map<std::string, size_t> &query_to_positio
 }
 
 void WriteBufferHeader(const std::unordered_map<size_t, std::string> &position_to_query,
-		       const std::vector<size_t> &queries_in_buffer,
+		       const std::unordered_set<size_t> &queries_in_buffer,
 		       const bm::serializer<bm::bvector<>>::buffer &sbuf, std::ostream *out) {
     // Write the header line of the packed format
     size_t n_reads = queries_in_buffer.size();
@@ -112,7 +113,7 @@ void WriteBuffer(bm::serializer<bm::bvector<>>::buffer &sbuf, std::ostream *out)
 }
 
 void WriteBlock(const bm::bvector<> &bits, const std::unordered_map<size_t, std::string> &pos_to_query,
-		const std::vector<size_t> &reads_in_buffer, std::ostream *out,
+		const std::unordered_set<size_t> &reads_in_buffer, std::ostream *out,
 		bm::serializer<bm::bvector<>> *bvs) {
 
     // Use serialization buffer class (automatic RAI, freed on destruction)
@@ -145,7 +146,7 @@ void BufferedPack(const Format &format, const std::unordered_map<std::string, si
 	pos_to_query.insert(std::make_pair(kv.second, kv.first));
     }
 
-    std::function<size_t(const std::string &line, const std::unordered_map<std::string, size_t> &query_to_position, const std::unordered_map<std::string, size_t> &ref_to_position, bm::bvector<>::bulk_insert_iterator *it, std::vector<size_t> *reads_in_buffer)> parser;
+    std::function<size_t(const std::string &line, const std::unordered_map<std::string, size_t> &query_to_position, const std::unordered_map<std::string, size_t> &ref_to_position, bm::bvector<>::bulk_insert_iterator *it, std::unordered_set<size_t> *reads_in_buffer)> parser;
     if (format == themisto) {
 	parser = ThemistoParser;
     } else if (format == fulgor) {
@@ -169,7 +170,7 @@ void BufferedPack(const Format &format, const std::unordered_map<std::string, si
     }
 
     size_t n_in_buffer = 0;
-    std::vector<size_t> reads_in_buffer;
+    std::unordered_set<size_t> reads_in_buffer;
     std::string line;
     while (std::getline(*in, line)) {
 	// Parse the line
@@ -207,9 +208,9 @@ void Pack(const bm::bvector<> &bits, const std::unordered_map<std::string, size_
     bvs.byte_order_serialization(false);
     bvs.gap_length_serialization(false);
 
-    std::vector<size_t> queries_in_buffer(query_to_position.size());
+    std::unordered_set<size_t> queries_in_buffer(query_to_position.size());
     for (size_t i = 0; i < query_to_position.size(); ++i) {
-	queries_in_buffer[i] = i;
+	queries_in_buffer.insert(i);
     }
 
     std::unordered_map<size_t, std::string> pos_to_query;
