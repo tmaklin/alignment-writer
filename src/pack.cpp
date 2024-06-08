@@ -111,6 +111,18 @@ void WriteBuffer(bm::serializer<bm::bvector<>>::buffer &sbuf, std::ostream *out)
     out->flush();
 }
 
+void WriteBlock(const bm::bvector<> &bits, const std::unordered_map<size_t, std::string> &pos_to_query,
+		const std::vector<size_t> &reads_in_buffer, std::ostream *out,
+		bm::serializer<bm::bvector<>> *bvs) {
+
+    // Use serialization buffer class (automatic RAI, freed on destruction)
+    bm::serializer<bm::bvector<>>::buffer sbuf;
+    bvs->serialize(bits, sbuf);
+
+    WriteBufferHeader(pos_to_query, reads_in_buffer, sbuf, out);
+    WriteBuffer(sbuf, out);
+}
+
 void BufferedPack(const Format &format, const std::unordered_map<std::string, size_t> &query_to_position, const std::unordered_map<std::string, size_t> &ref_to_position, const size_t &buffer_size, std::istream *in, std::ostream *out) {
     // Buffered read + packing from a stream
     // Write info about the pseudoalignment
@@ -166,13 +178,8 @@ void BufferedPack(const Format &format, const std::unordered_map<std::string, si
 	if (n_in_buffer > buffer_size) {
   	    // Force flush on the inserter to ensure everything is saved
 	    it.flush();
+	    WriteBlock(bits, pos_to_query, reads_in_buffer, out, &bvs);
 
-	    // Use serialization buffer class (automatic RAI, freed on destruction)
-	    bm::serializer<bm::bvector<>>::buffer sbuf;
-	    bvs.serialize(bits, sbuf);
-
-	    WriteBufferHeader(pos_to_query, reads_in_buffer, sbuf, out);
-	    WriteBuffer(sbuf, out);
 	    bits.clear(true);
 	    bits.set_new_blocks_strat(bm::BM_GAP);
 	    reads_in_buffer.clear();
@@ -183,33 +190,33 @@ void BufferedPack(const Format &format, const std::unordered_map<std::string, si
     if (reads_in_buffer.size() > 0) {
 	// Write the remaining bits
 	it.flush();
-
-	// Use serialization buffer class (automatic RAI, freed on destruction)
-	bm::serializer<bm::bvector<>>::buffer sbuf;
-	bvs.serialize(bits, sbuf);
-
-	WriteBufferHeader(pos_to_query, reads_in_buffer, sbuf, out);
-	WriteBuffer(sbuf, out);
+	WriteBlock(bits, pos_to_query, reads_in_buffer, out, &bvs);
     }
-    out->flush(); // Flush
 }
 
-void Pack(const bm::bvector<> &bits, const size_t n_refs, const size_t n_reads, std::ostream *out) {
+void Pack(const bm::bvector<> &bits, const std::unordered_map<std::string, size_t> &query_to_position,
+	  const std::unordered_map<std::string, size_t> &ref_to_position,
+	  const size_t n_refs, const size_t n_reads, std::ostream *out) {
     // Pack a pseudoalignment that has been stored in memory
     // Write info about the pseudoalignment
     CheckInput(n_refs, n_reads);
-    // WriteHeader(n_refs, n_reads, out);
+    WriteHeader(query_to_position, ref_to_position, out);
 
     // Next settings provide the lowest size (see BitMagic documentation/examples)
     bm::serializer<bm::bvector<>> bvs;
     bvs.byte_order_serialization(false);
     bvs.gap_length_serialization(false);
 
-    // Use serialization buffer class (automatic RAI, freed on destruction)
-    bm::serializer<bm::bvector<>>::buffer sbuf;
-    bvs.serialize(bits, sbuf);
+    std::vector<size_t> queries_in_buffer(query_to_position.size());
+    for (size_t i = 0; i < query_to_position.size(); ++i) {
+	queries_in_buffer[i] = i;
+    }
 
-    WriteBuffer(sbuf, out);
-    out->flush(); // Flush
+    std::unordered_map<size_t, std::string> pos_to_query;
+    for (auto kv : query_to_position) {
+	pos_to_query.insert(std::make_pair(kv.second, kv.first));
+    }
+
+    WriteBlock(bits, pos_to_query, queries_in_buffer, out, &bvs);
 }
 }
