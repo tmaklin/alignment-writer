@@ -67,15 +67,17 @@ nlohmann::json_abi_v3_11_3::json DeserializeBlockHeader(std::stringbuf &buffer) 
     return nlohmann::json_abi_v3_11_3::json::parse(instr);
 }
 
-void ReadBlockHeader(const std::string &line, std::istream *in, size_t *block_size) {
-    size_t header_buffer_size = std::stoul(line);
+std::stringbuf ReadBlockHeader(const std::string &line, std::istream *in, size_t *block_size) {
+    auto header_data = nlohmann::json_abi_v3_11_3::json::parse(line);
+    size_t header_buffer_size = (size_t)header_data["header_size"];
 
     std::stringbuf buffer;
     for (size_t i = 0; i < header_buffer_size; ++i) {
 	buffer.sputc(in->get());
     }
 
-    *block_size = (size_t)DeserializeBlockHeader(buffer)["block_size"];
+    *block_size = (size_t)header_data["block_size"];
+    return buffer; // Use DeserializeBlockHeader to read contents is needed
 }
 
 

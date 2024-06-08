@@ -88,7 +88,6 @@ void WriteBufferHeader(const std::unordered_map<size_t, std::string> &position_t
     std::stringbuf buf;
     bxz::ostream lzma(&buf, bxz::lzma, 1);
     lzma << "{";
-    lzma << "\"block_size\":" << sz << ',';
     lzma << "\"queries\":[";
     size_t n_written = 0;
     for (auto query_pos : queries_in_buffer) {
@@ -97,7 +96,7 @@ void WriteBufferHeader(const std::unordered_map<size_t, std::string> &position_t
     }
     lzma << '}';
     lzma.flush();
-    *out << buf.str().size() << '\n';
+    *out << '{' << "\"header_size\":" << buf.str().size() << ',' << "\"block_size\":" << sz << '}' << '\n';
     *out << buf.str();
     out->flush();
 }
