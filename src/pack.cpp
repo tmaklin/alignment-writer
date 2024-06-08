@@ -78,24 +78,14 @@ void WriteHeader(const std::unordered_map<std::string, size_t> &query_to_positio
     out->flush();
 }
 
-void WriteBufferHeader(const std::unordered_map<size_t, std::string> &position_to_query,
-		       const std::unordered_set<size_t> &queries_in_buffer,
-		       const bm::serializer<bm::bvector<>>::buffer &sbuf, std::ostream *out) {
+void WriteBufferHeader(const std::string &query_info,
+		       const bm::serializer<bm::bvector<>>::buffer &sbuf,
+		       std::ostream *out) {
     // Write the header line of the packed format
-    size_t n_reads = queries_in_buffer.size();
-
     auto sz = sbuf.size();
-
     std::stringbuf buf;
     bxz::ostream lzma(&buf, bxz::lzma, 1);
-    lzma << "{";
-    lzma << "\"queries\":[";
-    size_t n_written = 0;
-    for (auto query_pos : queries_in_buffer) {
-	lzma << "{\"query\":\"" << position_to_query.at(query_pos) << '"' << ',' << "\"pos\":" << query_pos << '}'<< ((n_written == n_reads - 1) ? ']' : ',');
-	++n_written;
-    }
-    lzma << '}';
+    lzma << query_info;
     lzma.flush();
     *out << '{' << "\"header_size\":" << buf.str().size() << ',' << "\"block_size\":" << sz << '}' << '\n';
     *out << buf.str();
@@ -112,15 +102,35 @@ void WriteBuffer(bm::serializer<bm::bvector<>>::buffer &sbuf, std::ostream *out)
     out->flush();
 }
 
-void WriteBlock(const bm::bvector<> &bits, const std::unordered_map<size_t, std::string> &pos_to_query,
-		const std::unordered_set<size_t> &reads_in_buffer, std::ostream *out,
-		bm::serializer<bm::bvector<>> *bvs) {
+std::string QueryInfoToJSON(const std::unordered_map<size_t, std::string> &pos_to_query,
+			    const std::unordered_set<size_t> &queries_in_buffer) {
+    std::string json_string;
+    json_string = "{";
+    json_string += "\"queries\":[";
+    size_t n_written = 0;
+    size_t n_to_write = queries_in_buffer.size();
+    for (auto query_pos : queries_in_buffer) {
+	json_string += "{\"query\":\"";
+	json_string += pos_to_query.at(query_pos);
+	json_string += '"';
+	json_string += ',';
+	json_string += "\"pos\":";
+	json_string += query_pos;
+	json_string += '}';
+	json_string += ((n_written == n_to_write - 1) ? ']' : ',');
+	++n_written;
+    }
+    json_string += '}';
+    return json_string;
+}
 
+void WriteBlock(const bm::bvector<> &bits, const std::string &query_info,
+		std::ostream *out, bm::serializer<bm::bvector<>> *bvs) {
     // Use serialization buffer class (automatic RAI, freed on destruction)
     bm::serializer<bm::bvector<>>::buffer sbuf;
     bvs->serialize(bits, sbuf);
 
-    WriteBufferHeader(pos_to_query, reads_in_buffer, sbuf, out);
+    WriteBufferHeader(query_info, sbuf, out);
     WriteBuffer(sbuf, out);
 }
 
@@ -179,7 +189,8 @@ void BufferedPack(const Format &format, const std::unordered_map<std::string, si
 	if (n_in_buffer > buffer_size) {
   	    // Force flush on the inserter to ensure everything is saved
 	    it.flush();
-	    WriteBlock(bits, pos_to_query, reads_in_buffer, out, &bvs);
+	    const std::string &query_info = QueryInfoToJSON(pos_to_query, reads_in_buffer);
+	    WriteBlock(bits, query_info, out, &bvs);
 
 	    bits.clear(true);
 	    bits.set_new_blocks_strat(bm::BM_GAP);
@@ -191,7 +202,8 @@ void BufferedPack(const Format &format, const std::unordered_map<std::string, si
     if (reads_in_buffer.size() > 0) {
 	// Write the remaining bits
 	it.flush();
-	WriteBlock(bits, pos_to_query, reads_in_buffer, out, &bvs);
+	const std::string &query_info = QueryInfoToJSON(pos_to_query, reads_in_buffer);
+	WriteBlock(bits, query_info, out, &bvs);
     }
 }
 
@@ -218,6 +230,7 @@ void Pack(const bm::bvector<> &bits, const std::unordered_map<std::string, size_
 	pos_to_query.insert(std::make_pair(kv.second, kv.first));
     }
 
-    WriteBlock(bits, pos_to_query, queries_in_buffer, out, &bvs);
+    const std::string &query_info = QueryInfoToJSON(pos_to_query, queries_in_buffer);
+    WriteBlock(bits, query_info, out, &bvs);
 }
 }
