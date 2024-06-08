@@ -39,8 +39,9 @@
 #include <exception>
 #include <memory>
 #include <unordered_map>
+#include <filesystem>
 
-#include "cxxargs.hpp"
+#include "cxxopts.hpp"
 #include "bxzstr.hpp"
 #include "kseq++/seqio.hpp"
 
@@ -53,111 +54,235 @@ bool CmdOptionPresent(char **begin, char **end, const std::string &option) {
   return (std::find(begin, end, option) != end);
 }
 
-void parse_args(int argc, char* argv[], cxxargs::Arguments &args) {
-  args.add_short_argument<std::string>('f', "Pseudoalignment file, packed or unpacked, read from cin if not supplied.", "");
-  args.add_short_argument<std::string>('r', "Input reads in .fastq(.gz) format (required for packing)");
-  args.add_short_argument<std::string>('l', "List containing reference names (1 per line, required for packing).");
-  args.add_short_argument<bool>('d', "Unpack pseudoalignment.", false);
-  args.add_long_argument<size_t>("buffer-size", "Buffer size for buffered packing (default: 100000", (size_t)100000);
-  args.add_long_argument<std::string>("format", "Input file format (one of `themisto` (default), `fulgor`, `bifrost` `metagraph`, `sam`)", "themisto");
-  if (CmdOptionPresent(argv, argv+argc, "-d")) {
-      args.set_not_required('r');
-      args.set_not_required('l');
-  }
-  args.add_long_argument<bool>("help", "Print the help message.", false);
-  if (CmdOptionPresent(argv, argv+argc, "--help")) {
-      std::cerr << "\n" + args.help() << '\n' << '\n';
-  }
-  args.parse(argc, argv);
+bool parse_args(int argc, char* argv[], cxxopts::Options &options) {
+    options.add_options()
+	("z,compress", "Compress file(s).", cxxopts::value<bool>()->default_value("false"))
+	("d,decompress", "Decompress file(s).", cxxopts::value<bool>()->default_value("false"))
+	("r,reads", "Reads used in the input alignment.", cxxopts::value<std::string>())
+	("l,target-list", "File listing the input alignment targets.", cxxopts::value<std::string>())
+	("format", "Input/output format", cxxopts::value<std::string>()->default_value("themisto"))
+	("k,keep", "Keep input file(s) instead of deleting.", cxxopts::value<bool>()->default_value("false"))
+	("f,force", "Force overwrite output file(s).", cxxopts::value<bool>()->default_value("false"))
+	("c,stdout", "Write to standard out, keep files.", cxxopts::value<bool>()->default_value("false"))
+	("T,threads", "Use `arg` threads, 0 = all available.", cxxopts::value<size_t>()->default_value("1"))
+	("b,buffer-size", "buffer size per thread in KiB.", cxxopts::value<size_t>()->default_value("128"))
+	("h,help", "Print this message and quit.", cxxopts::value<bool>()->default_value("false"))
+	("V,version", "Print the version and quit.", cxxopts::value<bool>()->default_value("false"))
+	("filenames", "Input files as positional arguments", cxxopts::value<std::vector<std::string>>()->default_value(""));
+
+    // options.allow_unrecognised_options(); // Handle the levels
+    options.positional_help("[files]");
+    options.custom_help("[options]");
+    options.parse_positional({ "filenames" });
+
+    if (CmdOptionPresent(argv, argv+argc, "--help") || CmdOptionPresent(argv, argv+argc, "-h")) {
+	std::cerr << options.help() << std::endl;
+	return true; // quit
+    } else if (CmdOptionPresent(argv, argv+argc, "--version") || CmdOptionPresent(argv, argv+argc, "-V")) {
+	std::cerr << "alignment-writer " << ALIGNMENT_WRITER_BUILD_VERSION << std::endl;
+	return true; // quit
+    }
+
+    return false; // parsing successfull
+}
+
+bool file_exists(const std::string &file_path) {
+    std::filesystem::path check_file{ file_path };
+    return std::filesystem::exists(check_file);
 }
 
 int main(int argc, char* argv[]) {
-    cxxargs::Arguments args("alignment-writer-" + std::string(ALIGNMENT_WRITER_BUILD_VERSION), "Usage: alignment-writer -f <input-file>");
+    std::string program_name = "alignment-writer";
+    std::string fileformat_suffix = ".aln";
+    cxxopts::Options opts(program_name, program_name + ": compress or decompress pseudoalignment files.");
     try {
-	parse_args(argc, argv, args);
+	bool quit = parse_args(argc, argv, opts);
+	if (quit) {
+	    return 0;
+	}
     } catch (std::exception &e) {
-	std::cerr << "Parsing arguments failed:\n"
-		  << std::string("\t") + std::string(e.what()) + "\n"
-		  << "\trun alignment-writer with the --help option for usage instructions.\n";
-	std::cerr << std::endl;
+	std::cerr << program_name + ": parsing arguments failed: " << std::string(e.what()) << std::endl;
 	return 1;
     }
 
+    const auto &args = opts.parse(argc, argv);
+
     alignment_writer::Format format;
-    if (args.value<std::string>("format") == "themisto") {
+    if (args["format"].as<std::string>() == "themisto") {
 	format = alignment_writer::themisto;
-    } else if (args.value<std::string>("format") == "fulgor") {
+    } else if (args["format"].as<std::string>() == "fulgor") {
 	format = alignment_writer::fulgor;
-    } else if (args.value<std::string>("format") == "bifrost") {
+    } else if (args["format"].as<std::string>() == "bifrost") {
 	format = alignment_writer::bifrost;
-    } else if (args.value<std::string>("format") == "metagraph") {
+    } else if (args["format"].as<std::string>() == "metagraph") {
 	format = alignment_writer::metagraph;
-    } else if (args.value<std::string>("format") == "sam") {
+    } else if (args["format"].as<std::string>() == "sam") {
 	format = alignment_writer::sam;
     } else {
 	throw std::runtime_error("Unrecognized input format.");
     }
 
-    std::unique_ptr<std::istream> in;
-    if (args.value<std::string>('f').empty()) {
-	in = std::unique_ptr<std::istream>(&std::cin);
-    } else {
-	const std::string &infile = args.value<std::string>('f');
-	in = std::unique_ptr<std::istream>(new bxz::ifstream(infile));
+    // 0 == read from cin
+    const std::vector<std::string> &input_files = args["filenames"].as<std::vector<std::string>>();
+    size_t n_input_files = input_files.size();
+
+    // Don't write compressed data to terminal unless asked
+    if (!args["force"].as<bool>() && !args["decompress"].as<bool>() && input_files[0].empty()) {
+	// Refuse to write to terminal without -f or -c
+	if (isatty(fileno(stdout))) {
+	    std::cerr << program_name + ": refusing to write compressed data to terminal. Use -f to force write.\n" + program_name + ": try `" + program_name + "--help` for help." << std::endl;
+	    return 1;
+	}
     }
 
-    if (args.value<bool>('d')) {
-	alignment_writer::Print(in.get(), &std::cout);
-    } else {
-
-	std::unordered_map<std::string, size_t> query_to_position;
-	try {
-	    klibpp::KSeq record;
-	    klibpp::SeqStreamIn iss(args.value<std::string>('r').c_str());
-	    size_t read_pos = 0;
-	    while (iss >> record) {
-		query_to_position.insert(std::make_pair(std::string(record.name), read_pos));
-		++read_pos;
+    // Decompress from and to terminal
+    if (!isatty(fileno(stdin))) {
+	// Compress from cin to cout
+	if (args["decompress"].as<bool>()) {
+	    alignment_writer::Print(&std::cin, &std::cout);
+	} else {
+	    std::unordered_map<std::string, size_t> query_to_position;
+	    try {
+		klibpp::KSeq record;
+		klibpp::SeqStreamIn iss(args["reads"].as<std::string>().c_str());
+		size_t read_pos = 0;
+		while (iss >> record) {
+		    query_to_position.insert(std::make_pair(std::string(record.name), read_pos));
+		    ++read_pos;
+		}
+	    } catch (const std::exception &e) {
+		std::cerr << "Reading from input `-r " << args["reads"].as<std::string>() << "` failed:" << e.what() << std::endl;
 	    }
-	} catch (const std::exception &e) {
-	    std::cerr << "Reading from input `-r " << args.value<std::string>('r') << "` failed:" << e.what() << std::endl;
-	}
 
-	if (query_to_position.size() == 0) {
-	    std::cerr << "Input: `-r " << args.value<std::string>('r') << "` has no reads!" << std::endl;
-	    return 1;
-	}
-
-	std::unordered_map<std::string, size_t> ref_to_position;
-	try {
-	    bxz::ifstream in(args.value<std::string>('l'));
-	    std::string line;
-	    size_t ref_pos = 0;
-	    while (std::getline(in, line)) {
-		ref_to_position.insert(std::make_pair(line, ref_pos));
-		++ref_pos;
+	    if (query_to_position.size() == 0) {
+		std::cerr << "Input: `-r " << args["reads"].as<std::string>() << "` has no reads!" << std::endl;
+		return 1;
 	    }
-	    in.close();
-	} catch (const std::exception &e) {
-	    std::cerr << "Reading from input `-l " << args.value<std::string>('r') << "` failed:" << e.what() << std::endl;
-	}
 
-	if (ref_to_position.size() == 0) {
-	    std::cerr << "Input: `-l " << args.value<std::string>('r') << "` has no lines!" << std::endl;
-	    return 1;
-	}
+	    std::unordered_map<std::string, size_t> ref_to_position;
+	    try {
+		bxz::ifstream in(args["target-list"].as<std::string>());
+		std::string line;
+		size_t ref_pos = 0;
+		while (std::getline(in, line)) {
+		    ref_to_position.insert(std::make_pair(line, ref_pos));
+		    ++ref_pos;
+		}
+		in.close();
+	    } catch (const std::exception &e) {
+		std::cerr << "Reading from input `-l " << args["reads"].as<std::string>() << "` failed:" << e.what() << std::endl;
+	    }
 
-	try {
-	    alignment_writer::BufferedPack(format, query_to_position, ref_to_position, args.value<size_t>("buffer-size"), in.get(), &std::cout);
-	} catch (const std::invalid_argument &e) {
-	    std::cerr << "Reading the alignment failed: " << e.what() << " (is `--format " << args.value<std::string>("format") << "` correct?)" << std::endl;
-	    return 1;
-	} catch (const std::exception &e) {
-	    std::cerr << "Reading the alignment failed: " << e.what() << '.' << std::endl;
+	    if (ref_to_position.size() == 0) {
+		std::cerr << "Input: `-l " << args["reads"].as<std::string>() << "` has no lines!" << std::endl;
+		return 1;
+	    }
+	    alignment_writer::BufferedPack(format, query_to_position, ref_to_position, args["buffer-size"].as<size_t>()*8000, &std::cin, &std::cout);
 	}
     }
-    if (args.value<std::string>('f').empty()) {
-	in.release(); // Release ownership of std::cout so we don't try to free it
+
+    // Decompress input files
+    if (!input_files[0].empty()) {
+	// Compress/decompress all positional arguments
+	if (!args["decompress"].as<bool>() || args["compress"].as<bool>()) {
+	    // Run compression loop
+	    std::unordered_map<std::string, size_t> query_to_position;
+	    try {
+		klibpp::KSeq record;
+		klibpp::SeqStreamIn iss(args["reads"].as<std::string>().c_str());
+		size_t read_pos = 0;
+		while (iss >> record) {
+		    query_to_position.insert(std::make_pair(std::string(record.name), read_pos));
+		    ++read_pos;
+		}
+	    } catch (const std::exception &e) {
+		std::cerr << "Reading from input `-r " << args["reads"].as<std::string>() << "` failed:" << e.what() << std::endl;
+	    }
+
+	    if (query_to_position.size() == 0) {
+		std::cerr << "Input: `-r " << args["reads"].as<std::string>() << "` has no reads!" << std::endl;
+		return 1;
+	    }
+
+	    std::unordered_map<std::string, size_t> ref_to_position;
+	    try {
+		bxz::ifstream in(args["target-list"].as<std::string>());
+		std::string line;
+		size_t ref_pos = 0;
+		while (std::getline(in, line)) {
+		    ref_to_position.insert(std::make_pair(line, ref_pos));
+		    ++ref_pos;
+		}
+		in.close();
+	    } catch (const std::exception &e) {
+		std::cerr << "Reading from input `-l " << args["reads"].as<std::string>() << "` failed:" << e.what() << std::endl;
+	    }
+
+	    if (ref_to_position.size() == 0) {
+		std::cerr << "Input: `-l " << args["reads"].as<std::string>() << "` has no lines!" << std::endl;
+		return 1;
+	    }
+	    for (size_t i = 0; i < n_input_files; ++i) {
+		const std::string &infile = input_files[i];
+		if (!file_exists(infile)) {
+		    std::cerr << program_name + ": " << infile << ": no such file or directory." << std::endl;
+		    return 1;
+		}
+		bxz::ifstream in_stream(infile); // Handle compressed inputs
+		if (!args["stdout"].as<bool>()) {
+		    // Add .aln suffix to infile name
+		    const std::string &outfile = infile + fileformat_suffix;
+		    if (file_exists(outfile) && !args["force"].as<bool>()) {
+			std::cerr << program_name + ": " << outfile << ": file exists; use `--force` to overwrite." << std::endl;
+			return 1;
+		    }
+		    std::ofstream out_stream(outfile);
+
+		    alignment_writer::BufferedPack(format, query_to_position, ref_to_position, args["buffer-size"].as<size_t>()*8000, &in_stream, &out_stream);
+		} else {
+		    // Compress to cout
+		    alignment_writer::BufferedPack(format, query_to_position, ref_to_position, args["buffer-size"].as<size_t>()*8000, &in_stream, &std::cout);
+		}
+
+		if (!args["keep"].as<bool>() && !args["stdout"].as<bool>()) {
+		    std::filesystem::path remove_file{ infile };
+		    std::filesystem::remove(remove_file);
+		}
+	    }
+	} else if (args["decompress"].as<bool>() && !args["compress"].as<bool>()) {
+	    // Run decompressor loop
+	    for (size_t i = 0; i < n_input_files; ++i) {
+		const std::string &infile = input_files[i];
+		if (!file_exists(infile)) {
+		    std::cerr << program_name + ": " << infile << ": no such file or directory." << std::endl;
+		    return 1;
+		}
+
+		// Remove the .aln suffix from the infile name
+		size_t lastindex = infile.find_last_of(".");
+
+		// Decompresses to cout if `outfile` equals empty
+		std::string outfile = (args["stdout"].as<bool>() ? "" : infile.substr(0, lastindex));
+
+		if (file_exists(outfile) && !args["force"].as<bool>()) {
+		    std::cerr << program_name + ": " << outfile << ": file exists; use `--force` to overwrite." << std::endl;
+		    return 1;
+		}
+
+		bxz::ifstream in_stream(infile);
+		if (args["stdout"].as<bool>()) {
+		    alignment_writer::Print(&in_stream, &std::cout);
+		} else {
+		    std::ofstream out_stream(outfile);
+		    alignment_writer::Print(&in_stream, &out_stream);
+		}
+
+		if (!args["keep"].as<bool>() && !args["stdout"].as<bool>()) {
+		    std::filesystem::path remove_file{ infile };
+		    std::filesystem::remove(remove_file);
+		}
+	    }
+	}
     }
 
     return 0;
