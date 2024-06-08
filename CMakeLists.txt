@@ -158,24 +158,25 @@ else()
 endif()
 include_directories(${CMAKE_BXZSTR_HEADERS})
 
-## cxxargs
-if (DEFINED CMAKE_CXXARGS_HEADERS)
-  message(STATUS "cxxargs headers provided in: ${CMAKE_CXXARGS_HEADERS}")
+### cxxopts
+if (DEFINED CMAKE_CXXOPTS_HEADERS)
+  message(STATUS "cxxopts headers provided in: ${CMAKE_CXXOPTS_HEADERS}")
 else()
-  FetchContent_Declare(cxxargs
-    GIT_REPOSITORY    https://github.com/tmaklin/cxxargs.git
-    GIT_TAG           v1.1.4
+  FetchContent_Declare(cxxopts
+    GIT_REPOSITORY    https://github.com/jarro2783/cxxopts
+    GIT_TAG           v3.1.1
     PREFIX            "external"
-    SOURCE_DIR        "${CMAKE_CURRENT_SOURCE_DIR}/external/cxxargs"
+    SOURCE_DIR        "${CMAKE_CURRENT_SOURCE_DIR}/external/cxxopts"
     BUILD_IN_SOURCE   0
     BUILD_COMMAND     ""
     CONFIGURE_COMMAND ""
     INSTALL_COMMAND   ""
     )
-  FetchContent_MakeAvailable(cxxargs)
-  set(CMAKE_CXXARGS_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/external/cxxargs/include)
+  FetchContent_MakeAvailable(cxxopts)
+  add_dependencies(alignment-writer cxxopts)
+  set(CMAKE_CXXOPTS_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/external/cxxopts/include)
 endif()
-include_directories("${CMAKE_CXXARGS_HEADERS}")
+include_directories(${CMAKE_CXXOPTS_HEADERS})
 
 # Link libraries
 if (OPENMP_FOUND)
