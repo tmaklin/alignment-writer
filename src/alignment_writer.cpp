@@ -65,7 +65,7 @@ bool parse_args(int argc, char* argv[], cxxopts::Options &options) {
 	("f,force", "Force overwrite output file(s).", cxxopts::value<bool>()->default_value("false"))
 	("c,stdout", "Write to standard out, keep files.", cxxopts::value<bool>()->default_value("false"))
 	("T,threads", "Use `arg` threads, 0 = all available.", cxxopts::value<size_t>()->default_value("1"))
-	("b,buffer-size", "buffer size per thread in KiB.", cxxopts::value<size_t>()->default_value("128"))
+	("b,buffer-size", "Buffer writes every `arg` hits.", cxxopts::value<size_t>()->default_value("256000"))
 	("h,help", "Print this message and quit.", cxxopts::value<bool>()->default_value("false"))
 	("V,version", "Print the version and quit.", cxxopts::value<bool>()->default_value("false"))
 	("filenames", "Input files as positional arguments", cxxopts::value<std::vector<std::string>>()->default_value(""));
@@ -209,7 +209,7 @@ int main(int argc, char* argv[]) {
 		return 1;
 	    }
 	    try {
-		alignment_writer::BufferedPack(format, query_to_position, ref_to_position, args["buffer-size"].as<size_t>()*8000, &std::cin, &std::cout);
+		alignment_writer::BufferedPack(format, query_to_position, ref_to_position, args["buffer-size"].as<size_t>(), &std::cin, &std::cout);
 	    } catch (const std::exception &e) {
 		std::cerr << program_name + ": error in reading data from terminal." << std::endl;
 		return 1;
@@ -268,7 +268,7 @@ int main(int argc, char* argv[]) {
 		    std::ofstream out_stream(outfile);
 
 		    try {
-			alignment_writer::BufferedPack(format, query_to_position, ref_to_position, args["buffer-size"].as<size_t>()*8000, &in_stream, &out_stream);
+			alignment_writer::BufferedPack(format, query_to_position, ref_to_position, args["buffer-size"].as<size_t>(), &in_stream, &out_stream);
 		    } catch (const std::exception &e) {
 			std::cerr << program_name + ": error in compressing file " << infile << " to file " << outfile << '.' << std::endl;
 			return 1;
@@ -276,7 +276,7 @@ int main(int argc, char* argv[]) {
 		} else {
 		    // Compress to cout
 		    try {
-			alignment_writer::BufferedPack(format, query_to_position, ref_to_position, args["buffer-size"].as<size_t>()*8000, &in_stream, &std::cout);
+			alignment_writer::BufferedPack(format, query_to_position, ref_to_position, args["buffer-size"].as<size_t>(), &in_stream, &std::cout);
 		    } catch (const std::exception &e) {
 			std::cerr << program_name + ": error in compressing file " << infile << '.' << std::endl;
 			return 1;
