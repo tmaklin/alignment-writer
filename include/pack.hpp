@@ -41,12 +41,59 @@
 #include <unordered_map>
 
 #include "bm64.h"
+#include "bmserial.h"
 
 #include "parser.hpp"
 
 namespace alignment_writer {
-// Pack a pseudoalignment that is already in memory
+// Pack a pseudoalignment already in memory as a BitMagic vector
 void Pack(const bm::bvector<> &bits, const size_t n_refs, const size_t n_reads, std::ostream *out);
+
+// Pack a pseudoalignment stored in some iterable container
+template <typename T>
+inline void PackContainer(T &bits, const size_t n_refs, const size_t n_reads, std::ostream *out) {
+    bm::bvector<> bm_bits;
+    bm_bits.set_new_blocks_strat(bm::BM_GAP);
+    bm::bvector<>::bulk_insert_iterator bm_it(bm_bits);
+
+    bm_bits.resize((size_t)(n_reads * n_refs));
+    typename T::iterator iter = bits.begin();
+    size_t pos = 0;
+    while (iter < bits.end()) {
+	if (*iter) {
+	    bm_it = pos;
+	}
+	++iter;
+	++pos;
+    }
+    Pack(bits, n_refs, n_reads, out);
+}
+
+// Write a single chunk
+void WriteBlock(const bm::bvector<> &bits, const std::string &query_info,
+		std::ostream *out, bm::serializer<bm::bvector<>> *bvs);
+// Write a single chunk stored in some iterable container
+template <typename T>
+void WriteContainerBlock(T &bits, const std::string &query_info, std::ostream *out) {
+    bm::bvector<> bm_bits;
+    bm_bits.set_new_blocks_strat(bm::BM_GAP);
+    bm::bvector<>::bulk_insert_iterator bm_it(bm_bits);
+
+    bm_bits.resize((size_t)(bits.end() - bits.begin()));
+    typename T::iterator iter = bits.begin();
+    size_t pos = 0;
+    while (iter < bits.end()) {
+	if (*iter) {
+	    bm_it = pos;
+	}
+	++iter;
+	++pos;
+    }
+    bm::serializer<bm::bvector<>> bvs;
+    bvs.byte_order_serialization(false);
+    bvs.gap_length_serialization(false);
+    WriteBlock(bm_bits, query_info, out, &bvs);
+}
 
 // Buffered read of a pseudoalignment from a stream and packing
 void BufferedPack(const Format &format,
