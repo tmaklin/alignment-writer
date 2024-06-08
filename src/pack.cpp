@@ -77,7 +77,7 @@ void WriteHeader(const std::unordered_map<std::string, size_t> &query_to_positio
     out->flush();
 }
 
-void WriteBufferHeader(const std::unordered_map<size_t, const std::string*> &position_to_query,
+void WriteBufferHeader(const std::unordered_map<size_t, std::string> &position_to_query,
 		       const std::vector<size_t> &queries_in_buffer, std::ostream *out) {
     // Write the header line of the packed format
     size_t n_reads = queries_in_buffer.size();
@@ -129,9 +129,9 @@ void BufferedPack(const Format &format, const std::unordered_map<std::string, si
     bits.set_new_blocks_strat(bm::BM_GAP);
     bm::bvector<>::bulk_insert_iterator it(bits);
 
-    std::unordered_map<size_t, const std::string*> pos_to_query;
+    std::unordered_map<size_t, std::string> pos_to_query;
     for (auto kv : query_to_position) {
-	pos_to_query.insert(std::make_pair(kv.second, &kv.first));
+	pos_to_query.insert(std::make_pair(kv.second, kv.first));
     }
 
     std::function<size_t(const std::string &line, const std::unordered_map<std::string, size_t> &query_to_position, const std::unordered_map<std::string, size_t> &ref_to_position, bm::bvector<>::bulk_insert_iterator *it, std::vector<size_t> *reads_in_buffer)> parser;
