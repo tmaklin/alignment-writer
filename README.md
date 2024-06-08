@@ -22,6 +22,7 @@ from the [Releases page](https://github.com/tmaklin/alignment-writer/releases).
 ### Compiling from source
 #### Requirements
 - C++17 compliant compiler.
+- liblzma
 - cmake
 - git
 - OpenMP (optional)
