@@ -66,12 +66,14 @@ inline void PackContainer(T &bits, const size_t n_refs, const size_t n_reads, st
 	++iter;
 	++pos;
     }
+    bm_it.flush();
     Pack(bits, n_refs, n_reads, out);
 }
 
 // Write a single chunk
 void WriteBlock(const bm::bvector<> &bits, const std::string &query_info,
 		std::ostream *out, bm::serializer<bm::bvector<>> *bvs);
+
 // Write a single chunk stored in some iterable container
 template <typename T>
 void WriteContainerBlock(T &bits, const std::string &query_info, std::ostream *out) {
@@ -89,6 +91,7 @@ void WriteContainerBlock(T &bits, const std::string &query_info, std::ostream *o
 	++iter;
 	++pos;
     }
+    bm_it.flush();
     bm::serializer<bm::bvector<>> bvs;
     bvs.byte_order_serialization(false);
     bvs.gap_length_serialization(false);
