@@ -89,6 +89,12 @@ void DeserializeBuffer(const size_t buffer_size, std::istream *in, bm::bvector<>
   delete[] cbuf;
 }
 
+void ReadBlock(const std::string &line, std::istream *in, bm::bvector<> *bits_out) {
+    size_t next_buffer_size = 0;
+    ReadBlockHeader(line, in, &next_buffer_size);
+    DeserializeBuffer(next_buffer_size, in, bits_out);
+}
+
 void Print(std::istream *in, std::ostream *out) {
     // Read size of alignment from the file
     size_t n_reads;
@@ -100,9 +106,7 @@ void Print(std::istream *in, std::ostream *out) {
 
     std::string line;
     while (std::getline(*in, line)) {
-	size_t next_buffer_size = 0;
-	ReadBlockHeader(line, in, &next_buffer_size);
-	DeserializeBuffer(next_buffer_size, in, &bits);
+	ReadBlock(line, in, &bits);
     }
 
     // Use an enumerator to traverse the pseudoaligned bits
@@ -133,8 +137,7 @@ void StreamingUnpack(std::istream *in, std::ostream *out) {
     std::string line;
     while (std::getline(*in, line)) { // Read size of next block
 	bm::bvector<> bits;
-	size_t next_buffer_size = std::stoul(line);
-	DeserializeBuffer(next_buffer_size, in, &bits);
+	ReadBlock(line, in, &bits);
 
 	// Use an enumerator to traverse the pseudoaligned bits
 	bm::bvector<>::enumerator en = bits.first();
@@ -161,28 +164,21 @@ void StreamingUnpack(std::istream *in, std::ostream *out) {
     out->flush(); // Flush
 }
 
-void UnpackData(std::istream *infile, bm::bvector<> &pseudoalignment) {
-    std::string next_line;
-    while (std::getline(*infile, next_line)) {
-        size_t next_buffer_size = std::stoul(next_line); // Read the size of the next chunk
-	alignment_writer::DeserializeBuffer(next_buffer_size, infile, &pseudoalignment); // Read the next chunk
-    }
-}
-
-bm::bvector<> Unpack(std::istream *infile, size_t *n_reads, size_t *n_refs) {
-    std::string next_line;
-
+bm::bvector<> Unpack(std::istream *in, size_t *n_reads, size_t *n_refs) {
     // Read the number of reads and reference sequences from the first line
-    alignment_writer::ReadHeader(infile, n_reads, n_refs);
+    alignment_writer::ReadHeader(in, n_reads, n_refs);
 
     // Read the chunks into `pseudoalignment`
-    bm::bvector<> pseudoalignment((*n_reads)*(*n_refs));
-    UnpackData(infile, pseudoalignment);
+    bm::bvector<> bits((*n_reads)*(*n_refs));
+    std::string line;
+    while (std::getline(*in, line)) {
+	ReadBlock(line, in, &bits);
+    }
 
     // Return the `n_reads x n_refs` contiguously stored matrix containing the pseudoalignment.
     // The pseudoalignment for the `n`th read against the `k`th reference sequence is contained
     // at position `n*n_refs + k` assuming indexing starts at 0.
-    return pseudoalignment;
+    return bits;
 }
 
 void ParallelUnpackData(std::istream *infile, bm::bvector<> &pseudoalignment) {
