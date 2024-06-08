@@ -70,10 +70,25 @@ void WriteHeader(const std::unordered_map<std::string, size_t> &query_to_positio
 	lzma << "{\"target\":\"" << kv.first << '"' << ',' << "\"pos\":" << kv.second << '}'<< ((n_written == n_refs - 1) ? ']' : ',');
 	++n_written;
     }
-    lzma << ',' << "\"queries\":[";
-    n_written = 0;
-    for (auto kv : query_to_position) {
-	lzma << "{\"query\":\"" << kv.first << '"' << ',' << "\"pos\":" << kv.second << '}'<< ((n_written == n_reads - 1) ? ']' : ',');
+    lzma << '}';
+    lzma.flush();
+    *out << buf.str().size() << '\n';
+    *out << buf.str();
+    out->flush();
+}
+
+void WriteBufferHeader(const std::unordered_map<size_t, const std::string*> &position_to_query,
+		       const std::vector<size_t> &queries_in_buffer, std::ostream *out) {
+    // Write the header line of the packed format
+    size_t n_reads = queries_in_buffer.size();
+
+    std::stringbuf buf;
+    bxz::ostream lzma(&buf, bxz::lzma, 1);
+    lzma << "{";
+    lzma << "\"queries\":[";
+    size_t n_written = 0;
+    for (auto query_pos : queries_in_buffer) {
+	lzma << "{\"query\":\"" << position_to_query.at(query_pos) << '"' << ',' << "\"pos\":" << query_pos << '}'<< ((n_written == n_reads - 1) ? ']' : ',');
 	++n_written;
     }
     lzma << '}';
@@ -153,6 +168,7 @@ void BufferedPack(const Format &format, const std::unordered_map<std::string, si
   	    // Force flush on the inserter to ensure everything is saved
 	    it.flush();
 
+	    WriteBufferHeader(pos_to_query, reads_in_buffer, out);
 	    WriteBuffer(bits, bvs, out);
 	    bits.clear(true);
 	    bits.set_new_blocks_strat(bm::BM_GAP);
@@ -163,6 +179,7 @@ void BufferedPack(const Format &format, const std::unordered_map<std::string, si
 
     // Write the remaining bits
     it.flush();
+    WriteBufferHeader(pos_to_query, reads_in_buffer, out);
     WriteBuffer(bits, bvs, out);
     out->flush(); // Flush
 }
