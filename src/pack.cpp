@@ -78,13 +78,17 @@ void WriteHeader(const std::unordered_map<std::string, size_t> &query_to_positio
 }
 
 void WriteBufferHeader(const std::unordered_map<size_t, std::string> &position_to_query,
-		       const std::vector<size_t> &queries_in_buffer, std::ostream *out) {
+		       const std::vector<size_t> &queries_in_buffer,
+		       const bm::serializer<bm::bvector<>>::buffer &sbuf, std::ostream *out) {
     // Write the header line of the packed format
     size_t n_reads = queries_in_buffer.size();
+
+    auto sz = sbuf.size();
 
     std::stringbuf buf;
     bxz::ostream lzma(&buf, bxz::lzma, 1);
     lzma << "{";
+    lzma << "\"block_size\":" << sz << ',';
     lzma << "\"queries\":[";
     size_t n_written = 0;
     for (auto query_pos : queries_in_buffer) {
@@ -98,18 +102,14 @@ void WriteBufferHeader(const std::unordered_map<size_t, std::string> &position_t
     out->flush();
 }
 
-void WriteBuffer(const bm::bvector<> &bits, bm::serializer<bm::bvector<>> &bvs, std::ostream *out) {
-    // Use serialization buffer class (automatic RAI, freed on destruction)
-    bm::serializer<bm::bvector<>>::buffer sbuf;
-    bvs.serialize(bits, sbuf);
-
+void WriteBuffer(bm::serializer<bm::bvector<>>::buffer &sbuf, std::ostream *out) {
     //  Write to *out
     auto sz = sbuf.size();
-    *out << sz << '\n';
     unsigned char* buf = sbuf.data();
     for (size_t i = 0; i < sz; ++i) {
 	*out << buf[i];
     }
+    out->flush();
 }
 
 void BufferedPack(const Format &format, const std::unordered_map<std::string, size_t> &query_to_position, const std::unordered_map<std::string, size_t> &ref_to_position, const size_t &buffer_size, std::istream *in, std::ostream *out) {
@@ -168,8 +168,12 @@ void BufferedPack(const Format &format, const std::unordered_map<std::string, si
   	    // Force flush on the inserter to ensure everything is saved
 	    it.flush();
 
-	    WriteBufferHeader(pos_to_query, reads_in_buffer, out);
-	    WriteBuffer(bits, bvs, out);
+	    // Use serialization buffer class (automatic RAI, freed on destruction)
+	    bm::serializer<bm::bvector<>>::buffer sbuf;
+	    bvs.serialize(bits, sbuf);
+
+	    WriteBufferHeader(pos_to_query, reads_in_buffer, sbuf, out);
+	    WriteBuffer(sbuf, out);
 	    bits.clear(true);
 	    bits.set_new_blocks_strat(bm::BM_GAP);
 	    reads_in_buffer.clear();
@@ -177,10 +181,17 @@ void BufferedPack(const Format &format, const std::unordered_map<std::string, si
 	}
     }
 
-    // Write the remaining bits
-    it.flush();
-    WriteBufferHeader(pos_to_query, reads_in_buffer, out);
-    WriteBuffer(bits, bvs, out);
+    if (reads_in_buffer.size() > 0) {
+	// Write the remaining bits
+	it.flush();
+
+	// Use serialization buffer class (automatic RAI, freed on destruction)
+	bm::serializer<bm::bvector<>>::buffer sbuf;
+	bvs.serialize(bits, sbuf);
+
+	WriteBufferHeader(pos_to_query, reads_in_buffer, sbuf, out);
+	WriteBuffer(sbuf, out);
+    }
     out->flush(); // Flush
 }
 
@@ -195,7 +206,11 @@ void Pack(const bm::bvector<> &bits, const size_t n_refs, const size_t n_reads, 
     bvs.byte_order_serialization(false);
     bvs.gap_length_serialization(false);
 
-    WriteBuffer(bits, bvs, out);
+    // Use serialization buffer class (automatic RAI, freed on destruction)
+    bm::serializer<bm::bvector<>>::buffer sbuf;
+    bvs.serialize(bits, sbuf);
+
+    WriteBuffer(sbuf, out);
     out->flush(); // Flush
 }
 }
