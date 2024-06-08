@@ -38,7 +38,6 @@
 #include <cmath>
 #include <sstream>
 #include <exception>
-#include <iostream>
 
 #include "nlohmann/json.hpp"
 #include "bmserial.h"
@@ -61,6 +60,19 @@ void ReadHeader(std::istream *in, size_t *n_reads, size_t *n_refs) {
     nlohmann::json_abi_v3_11_3::json header = nlohmann::json_abi_v3_11_3::json::parse(instr);
     *n_reads = header["n_queries"];
     *n_refs = header["n_targets"];
+}
+
+void ReadBlockHeader(const std::string &line, std::istream *in, size_t *block_size) {
+    size_t header_buffer_size = std::stoul(line);
+
+    std::stringbuf buffer;
+    for (size_t i = 0; i < header_buffer_size; ++i) {
+	buffer.sputc(in->get());
+    }
+
+    bxz::istream instr(&buffer);
+    nlohmann::json_abi_v3_11_3::json header = nlohmann::json_abi_v3_11_3::json::parse(instr);
+    *block_size = (size_t)header["block_size"];
 }
 
 void DeserializeBuffer(const size_t buffer_size, std::istream *in, bm::bvector<> *out) {
@@ -87,8 +99,9 @@ void Print(std::istream *in, std::ostream *out) {
     bm::bvector<> bits(n_reads*n_refs, bm::BM_GAP);
 
     std::string line;
-    while (std::getline(*in, line)) { // Read size of next block
-	size_t next_buffer_size = std::stoul(line);
+    while (std::getline(*in, line)) {
+	size_t next_buffer_size = 0;
+	ReadBlockHeader(line, in, &next_buffer_size);
 	DeserializeBuffer(next_buffer_size, in, &bits);
     }
 
