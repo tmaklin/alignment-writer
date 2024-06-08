@@ -62,6 +62,11 @@ void ReadHeader(std::istream *in, size_t *n_reads, size_t *n_refs) {
     *n_refs = header["n_targets"];
 }
 
+nlohmann::json_abi_v3_11_3::json DeserializeBlockHeader(std::stringbuf &buffer) {
+    bxz::istream instr(&buffer);
+    return nlohmann::json_abi_v3_11_3::json::parse(instr);
+}
+
 void ReadBlockHeader(const std::string &line, std::istream *in, size_t *block_size) {
     size_t header_buffer_size = std::stoul(line);
 
@@ -70,29 +75,31 @@ void ReadBlockHeader(const std::string &line, std::istream *in, size_t *block_si
 	buffer.sputc(in->get());
     }
 
-    bxz::istream instr(&buffer);
-    nlohmann::json_abi_v3_11_3::json header = nlohmann::json_abi_v3_11_3::json::parse(instr);
-    *block_size = (size_t)header["block_size"];
+    *block_size = (size_t)DeserializeBlockHeader(buffer)["block_size"];
 }
 
-void DeserializeBuffer(const size_t buffer_size, std::istream *in, bm::bvector<> *out) {
-  // Allocate space for the block
-  char* cbuf = new char[buffer_size];
 
-  // Read the next block into buf
-  in->read(cbuf, buffer_size);
-  unsigned char* buf = reinterpret_cast<unsigned char*>(const_cast<char*>(cbuf));
+std::basic_string<unsigned char> ReadBytes(const size_t bytes, std::istream *in) {
+    // Allocate space for the block
+    std::basic_string<char> cbuf(bytes, '=');
+    // char* cbuf = new char[bytes];
 
-  // Deserialize block (OR with old data in bits)
-  bm::deserialize((*out), buf);
+    // Read the next block into buf
+    in->read(cbuf.data(), bytes);
 
-  delete[] cbuf;
+    // Store the block in `vals`
+    unsigned char* buf = reinterpret_cast<unsigned char*>(cbuf.data());
+
+    return std::basic_string<unsigned char>(buf, bytes);
 }
 
 void ReadBlock(const std::string &line, std::istream *in, bm::bvector<> *bits_out) {
-    size_t next_buffer_size = 0;
-    ReadBlockHeader(line, in, &next_buffer_size);
-    DeserializeBuffer(next_buffer_size, in, bits_out);
+    size_t block_size = 0;
+    ReadBlockHeader(line, in, &block_size);
+    std::basic_string<unsigned char> buf = ReadBytes(block_size, in);
+
+    // Deserialize block (OR with old data in bits)
+    bm::deserialize((*bits_out), buf.data());
 }
 
 void Print(std::istream *in, std::ostream *out) {
@@ -196,19 +203,16 @@ void ParallelUnpackData(std::istream *infile, bm::bvector<> &pseudoalignment) {
     while (std::getline(*infile, next_line)) { // Read size of next block
         std::vector<std::basic_string<unsigned char>> vals;
 	for (size_t i = 0; i < n_threads && *infile; ++i) {
-	    size_t next_buffer_size = std::stoul(next_line);
 
-	    // Allocate space for the block
-	    char* cbuf = new char[next_buffer_size];
+	    // Read the block header
+	    size_t block_data_size = 0;
+	    ReadBlockHeader(next_line, infile, &block_data_size);
 
-	    // Read the next block into buf
-	    infile->read(cbuf, next_buffer_size);
+	    // Read the block data
+	    std::basic_string<unsigned char> block_data = std::move(ReadBytes(block_data_size, infile));
 
-	    // Store the block in `vals`
-	    unsigned char* buf = reinterpret_cast<unsigned char*>(const_cast<char*>(cbuf));
-	    vals.emplace_back(std::basic_string<unsigned char>(buf, next_buffer_size));
-
-	    delete[] cbuf;
+	    // Store data in `vals`
+	    vals.emplace_back(block_data);
 
 	    // Check if there is more to read
 	    infile->peek();
@@ -236,10 +240,7 @@ void ParallelUnpackData(std::istream *infile, bm::bvector<> &pseudoalignment) {
 }
 
 bm::bvector<> ParallelUnpack(std::istream *infile, size_t *n_reads, size_t *n_refs) {
-
     // Read the number of reads and reference sequences from the first line
-    std::string header_line;
-
     alignment_writer::ReadHeader(infile, n_reads, n_refs);
 
     bm::bvector<> pseudoalignment((*n_reads)*(*n_refs));
