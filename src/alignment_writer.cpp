@@ -91,6 +91,35 @@ bool file_exists(const std::string &file_path) {
     return std::filesystem::exists(check_file);
 }
 
+void read_compression_inputs(const std::string &reads_file, const std::string &refs_file,
+			     std::unordered_map<std::string, size_t> *query_to_position,
+			     std::unordered_map<std::string, size_t> *ref_to_position) {
+    klibpp::KSeq record;
+    klibpp::SeqStreamIn iss(reads_file.c_str());
+    size_t read_pos = 0;
+    while (iss >> record) {
+	query_to_position->insert(std::make_pair(std::string(record.name), read_pos));
+	++read_pos;
+    }
+
+    if (query_to_position->size() == 0) {
+	throw std::runtime_error("Input `--reads " + reads_file + "` has no reads!");
+    }
+
+    bxz::ifstream in(refs_file);
+    std::string line;
+    size_t ref_pos = 0;
+    while (std::getline(in, line)) {
+	ref_to_position->insert(std::make_pair(line, ref_pos));
+	++ref_pos;
+    }
+    in.close();
+
+    if (ref_to_position->size() == 0) {
+	throw std::runtime_error("Input `--target-list " + refs_file + "` is empty!");
+    }
+}
+
 int main(int argc, char* argv[]) {
     std::string program_name = "alignment-writer";
     std::string fileformat_suffix = ".aln";
@@ -126,6 +155,11 @@ int main(int argc, char* argv[]) {
     const std::vector<std::string> &input_files = args["filenames"].as<std::vector<std::string>>();
     size_t n_input_files = input_files.size();
 
+    if (n_input_files > 1 && !args["force"].as<bool>() && !args["decompress"].as<bool>()) {
+	std::cerr << program_name + ": refusing to compress more than 1 input files. Use -f to force compression\nNote: multiple inputs must have the same --reads and --target-list." << std::endl;
+	return 1;
+    }
+
     // Don't write compressed data to terminal unless asked
     if (!args["force"].as<bool>() && !args["decompress"].as<bool>() && input_files[0].empty()) {
 	// Refuse to write to terminal without -f or -c
@@ -139,45 +173,47 @@ int main(int argc, char* argv[]) {
     if (!isatty(fileno(stdin))) {
 	// Compress from cin to cout
 	if (args["decompress"].as<bool>()) {
-	    alignment_writer::Print(&std::cin, &std::cout);
-	} else {
-	    std::unordered_map<std::string, size_t> query_to_position;
 	    try {
-		klibpp::KSeq record;
-		klibpp::SeqStreamIn iss(args["reads"].as<std::string>().c_str());
-		size_t read_pos = 0;
-		while (iss >> record) {
-		    query_to_position.insert(std::make_pair(std::string(record.name), read_pos));
-		    ++read_pos;
-		}
+		alignment_writer::Print(&std::cin, &std::cout);
 	    } catch (const std::exception &e) {
-		std::cerr << "Reading from input `-r " << args["reads"].as<std::string>() << "` failed:" << e.what() << std::endl;
-	    }
-
-	    if (query_to_position.size() == 0) {
-		std::cerr << "Input: `-r " << args["reads"].as<std::string>() << "` has no reads!" << std::endl;
+		std::cerr << program_name + ": error in reading compressed data from terminal." << std::endl;
 		return 1;
 	    }
-
+	} else {
+	    std::string reads_file;
+	    std::string refs_file;
+	    try {
+		reads_file = args["reads"].as<std::string>().c_str();
+	    } catch (const cxxopts::exceptions::option_has_no_value &e) {
+		std::cerr << program_name + ": ERROR: option --reads has no value!" << std::endl;
+		return 1;
+	    } catch (const std::exception &e) {
+		std::cerr << program_name + ": ERROR: " << e.what() << std::endl;
+		return 1;
+	    }
+	    try {
+		refs_file = args["target-list"].as<std::string>().c_str();
+	    } catch (const cxxopts::exceptions::option_has_no_value &e) {
+		std::cerr << program_name + ": ERROR: option --target-list has no value!" << std::endl;
+		return 1;
+	    } catch (const std::exception &e) {
+		std::cerr << program_name + ": ERROR: " << e.what() << std::endl;
+		return 1;
+	    }
+	    std::unordered_map<std::string, size_t> query_to_position;
 	    std::unordered_map<std::string, size_t> ref_to_position;
 	    try {
-		bxz::ifstream in(args["target-list"].as<std::string>());
-		std::string line;
-		size_t ref_pos = 0;
-		while (std::getline(in, line)) {
-		    ref_to_position.insert(std::make_pair(line, ref_pos));
-		    ++ref_pos;
-		}
-		in.close();
+		read_compression_inputs(reads_file, refs_file, &query_to_position, &ref_to_position);
 	    } catch (const std::exception &e) {
-		std::cerr << "Reading from input `-l " << args["reads"].as<std::string>() << "` failed:" << e.what() << std::endl;
-	    }
-
-	    if (ref_to_position.size() == 0) {
-		std::cerr << "Input: `-l " << args["reads"].as<std::string>() << "` has no lines!" << std::endl;
+		std::cerr << program_name + ": ERROR: " << e.what() << std::endl;
 		return 1;
 	    }
-	    alignment_writer::BufferedPack(format, query_to_position, ref_to_position, args["buffer-size"].as<size_t>()*8000, &std::cin, &std::cout);
+	    try {
+		alignment_writer::BufferedPack(format, query_to_position, ref_to_position, args["buffer-size"].as<size_t>()*8000, &std::cin, &std::cout);
+	    } catch (const std::exception &e) {
+		std::cerr << program_name + ": error in reading data from terminal." << std::endl;
+		return 1;
+	    }
 	}
     }
 
@@ -186,42 +222,35 @@ int main(int argc, char* argv[]) {
 	// Compress/decompress all positional arguments
 	if (!args["decompress"].as<bool>() || args["compress"].as<bool>()) {
 	    // Run compression loop
-	    std::unordered_map<std::string, size_t> query_to_position;
+	    std::string reads_file;
+	    std::string refs_file;
 	    try {
-		klibpp::KSeq record;
-		klibpp::SeqStreamIn iss(args["reads"].as<std::string>().c_str());
-		size_t read_pos = 0;
-		while (iss >> record) {
-		    query_to_position.insert(std::make_pair(std::string(record.name), read_pos));
-		    ++read_pos;
-		}
+		reads_file = args["reads"].as<std::string>().c_str();
+	    } catch (const cxxopts::exceptions::option_has_no_value &e) {
+		std::cerr << program_name + ": ERROR: option --reads has no value!" << std::endl;
+		return 1;
 	    } catch (const std::exception &e) {
-		std::cerr << "Reading from input `-r " << args["reads"].as<std::string>() << "` failed:" << e.what() << std::endl;
-	    }
-
-	    if (query_to_position.size() == 0) {
-		std::cerr << "Input: `-r " << args["reads"].as<std::string>() << "` has no reads!" << std::endl;
+		std::cerr << program_name + ": ERROR: \"" << e.what() << '"' << std::endl;
 		return 1;
 	    }
-
+	    try {
+		refs_file = args["target-list"].as<std::string>().c_str();
+	    } catch (const cxxopts::exceptions::option_has_no_value &e) {
+		std::cerr << program_name + ": ERROR: option --target-list has no value!" << std::endl;
+		return 1;
+	    } catch (const std::exception &e) {
+		std::cerr << program_name + ": ERROR: " << e.what() << std::endl;
+		return 1;
+	    }
+	    std::unordered_map<std::string, size_t> query_to_position;
 	    std::unordered_map<std::string, size_t> ref_to_position;
 	    try {
-		bxz::ifstream in(args["target-list"].as<std::string>());
-		std::string line;
-		size_t ref_pos = 0;
-		while (std::getline(in, line)) {
-		    ref_to_position.insert(std::make_pair(line, ref_pos));
-		    ++ref_pos;
-		}
-		in.close();
+		read_compression_inputs(reads_file, refs_file, &query_to_position, &ref_to_position);
 	    } catch (const std::exception &e) {
-		std::cerr << "Reading from input `-l " << args["reads"].as<std::string>() << "` failed:" << e.what() << std::endl;
-	    }
-
-	    if (ref_to_position.size() == 0) {
-		std::cerr << "Input: `-l " << args["reads"].as<std::string>() << "` has no lines!" << std::endl;
+		std::cerr << program_name + ": ERROR: " << e.what() << std::endl;
 		return 1;
 	    }
+
 	    for (size_t i = 0; i < n_input_files; ++i) {
 		const std::string &infile = input_files[i];
 		if (!file_exists(infile)) {
@@ -238,10 +267,20 @@ int main(int argc, char* argv[]) {
 		    }
 		    std::ofstream out_stream(outfile);
 
-		    alignment_writer::BufferedPack(format, query_to_position, ref_to_position, args["buffer-size"].as<size_t>()*8000, &in_stream, &out_stream);
+		    try {
+			alignment_writer::BufferedPack(format, query_to_position, ref_to_position, args["buffer-size"].as<size_t>()*8000, &in_stream, &out_stream);
+		    } catch (const std::exception &e) {
+			std::cerr << program_name + ": error in compressing file " << infile << " to file " << outfile << '.' << std::endl;
+			return 1;
+		    }
 		} else {
 		    // Compress to cout
-		    alignment_writer::BufferedPack(format, query_to_position, ref_to_position, args["buffer-size"].as<size_t>()*8000, &in_stream, &std::cout);
+		    try {
+			alignment_writer::BufferedPack(format, query_to_position, ref_to_position, args["buffer-size"].as<size_t>()*8000, &in_stream, &std::cout);
+		    } catch (const std::exception &e) {
+			std::cerr << program_name + ": error in compressing file " << infile << '.' << std::endl;
+			return 1;
+		    }
 		}
 
 		if (!args["keep"].as<bool>() && !args["stdout"].as<bool>()) {
@@ -271,10 +310,20 @@ int main(int argc, char* argv[]) {
 
 		bxz::ifstream in_stream(infile);
 		if (args["stdout"].as<bool>()) {
-		    alignment_writer::Print(&in_stream, &std::cout);
+		    try {
+			alignment_writer::Print(&in_stream, &std::cout);
+		    } catch (const std::exception &e) {
+			std::cerr << program_name + ": error in reading compressed file " + infile << '.' << std::endl;
+			return 1;
+		    }
 		} else {
 		    std::ofstream out_stream(outfile);
-		    alignment_writer::Print(&in_stream, &out_stream);
+		    try {
+			alignment_writer::Print(&in_stream, &out_stream);
+		    } catch (const std::exception &e) {
+			std::cerr << program_name + ": error in decompressing file " + infile << " to file " << outfile << '.' << std::endl;
+			return 1;
+		    }
 		}
 
 		if (!args["keep"].as<bool>() && !args["stdout"].as<bool>()) {
