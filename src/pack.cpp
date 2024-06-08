@@ -114,7 +114,12 @@ void BufferedPack(const Format &format, const std::unordered_map<std::string, si
     bits.set_new_blocks_strat(bm::BM_GAP);
     bm::bvector<>::bulk_insert_iterator it(bits);
 
-    std::function<size_t(const std::string &line, const std::unordered_map<std::string, size_t> &query_to_position, const std::unordered_map<std::string, size_t> &ref_to_position, bm::bvector<>::bulk_insert_iterator *it)> parser;
+    std::unordered_map<size_t, const std::string*> pos_to_query;
+    for (auto kv : query_to_position) {
+	pos_to_query.insert(std::make_pair(kv.second, &kv.first));
+    }
+
+    std::function<size_t(const std::string &line, const std::unordered_map<std::string, size_t> &query_to_position, const std::unordered_map<std::string, size_t> &ref_to_position, bm::bvector<>::bulk_insert_iterator *it, std::vector<size_t> *reads_in_buffer)> parser;
     if (format == themisto) {
 	parser = ThemistoParser;
     } else if (format == fulgor) {
@@ -138,10 +143,11 @@ void BufferedPack(const Format &format, const std::unordered_map<std::string, si
     }
 
     size_t n_in_buffer = 0;
+    std::vector<size_t> reads_in_buffer;
     std::string line;
     while (std::getline(*in, line)) {
 	// Parse the line
-	n_in_buffer += parser(line, query_to_position, ref_to_position, &it);
+	n_in_buffer += parser(line, query_to_position, ref_to_position, &it, &reads_in_buffer);
 
 	if (n_in_buffer > buffer_size) {
   	    // Force flush on the inserter to ensure everything is saved
@@ -150,6 +156,7 @@ void BufferedPack(const Format &format, const std::unordered_map<std::string, si
 	    WriteBuffer(bits, bvs, out);
 	    bits.clear(true);
 	    bits.set_new_blocks_strat(bm::BM_GAP);
+	    reads_in_buffer.clear();
 	    n_in_buffer = 0;
 	}
     }

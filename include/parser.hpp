@@ -39,13 +39,14 @@
 #include <string>
 #include <unordered_map>
 #include <sstream>
+#include <vector>
 
 #include "bm64.h"
 
 namespace alignment_writer {
 enum Format { themisto, fulgor, bifrost, metagraph, sam };
 
-inline size_t ThemistoParser(const std::string &line, const std::unordered_map<std::string, size_t> &query_to_position, const std::unordered_map<std::string, size_t> &ref_to_position, bm::bvector<>::bulk_insert_iterator *it) {
+inline size_t ThemistoParser(const std::string &line, const std::unordered_map<std::string, size_t> &query_to_position, const std::unordered_map<std::string, size_t> &ref_to_position, bm::bvector<>::bulk_insert_iterator *it, std::vector<size_t> *reads_in_buffer) {
     // Reads a pseudoalignment line stored in the *Themisto* format and returns the number of pseudoalignments on the line
     size_t n_refs = ref_to_position.size();
     char separator = ' ';
@@ -53,6 +54,7 @@ inline size_t ThemistoParser(const std::string &line, const std::unordered_map<s
     std::string part;
     std::getline(stream, part, separator);
     size_t read_id = std::stoul(part); // First column is a numerical ID for the read
+    reads_in_buffer->push_back(read_id);
     size_t n_alignments = 0;
     while(std::getline(stream, part, separator)) {
 	// Buffered insertion to contiguously stored n_reads x n_refs pseudoalignment matrix
@@ -62,7 +64,7 @@ inline size_t ThemistoParser(const std::string &line, const std::unordered_map<s
     return n_alignments;
 }
 
-inline size_t FulgorParser(const std::string &line, const std::unordered_map<std::string, size_t> &query_to_position, const std::unordered_map<std::string, size_t> &ref_to_position, bm::bvector<>::bulk_insert_iterator *it) {
+inline size_t FulgorParser(const std::string &line, const std::unordered_map<std::string, size_t> &query_to_position, const std::unordered_map<std::string, size_t> &ref_to_position, bm::bvector<>::bulk_insert_iterator *it, std::vector<size_t> *reads_in_buffer) {
     // Reads a pseudoalignment line stored in the *Fulgor* format and returns the number of pseudoalignments on the line
     size_t n_refs = ref_to_position.size();
     char separator = '\t';
@@ -73,6 +75,7 @@ inline size_t FulgorParser(const std::string &line, const std::unordered_map<std
     std::getline(stream, part, separator); // Second column is the number of alignments
     size_t n_alignments = std::stoul(part);
     size_t read_id = query_to_position.at(query_name);
+    reads_in_buffer->push_back(read_id);
     while(std::getline(stream, part, separator)) {
 	// Buffered insertion to contiguously stored n_reads x n_refs pseudoalignment matrix
 	(*it) = read_id*n_refs + std::stoul(part);
@@ -80,7 +83,7 @@ inline size_t FulgorParser(const std::string &line, const std::unordered_map<std
     return n_alignments;
 }
 
-inline size_t BifrostParser(const std::string &line, const std::unordered_map<std::string, size_t> &query_to_position, const std::unordered_map<std::string, size_t> &ref_to_position, bm::bvector<>::bulk_insert_iterator *it) {
+inline size_t BifrostParser(const std::string &line, const std::unordered_map<std::string, size_t> &query_to_position, const std::unordered_map<std::string, size_t> &ref_to_position, bm::bvector<>::bulk_insert_iterator *it, std::vector<size_t> *reads_in_buffer) {
     // Reads a pseudoalignment line stored in the *Bifrost* format and returns the number of pseudoalignments on the line
     size_t n_refs = ref_to_position.size();
     char separator = '\t';
@@ -91,6 +94,7 @@ inline size_t BifrostParser(const std::string &line, const std::unordered_map<st
     size_t n_alignments = 0;
     size_t ref_id = 0;
     size_t read_id = query_to_position.at(query_name);
+    reads_in_buffer->push_back(read_id);
     while(std::getline(stream, part, separator)) {
 	// Buffered insertion to contiguously stored n_reads x n_refs pseudoalignment matrix
 	bool aligned = std::stoul(part) == 1;
@@ -103,7 +107,7 @@ inline size_t BifrostParser(const std::string &line, const std::unordered_map<st
     return n_alignments;
 }
 
-inline size_t MetagraphParser(const std::string &line, const std::unordered_map<std::string, size_t> &query_to_position, const std::unordered_map<std::string, size_t> &ref_to_position, bm::bvector<>::bulk_insert_iterator *it) {
+inline size_t MetagraphParser(const std::string &line, const std::unordered_map<std::string, size_t> &query_to_position, const std::unordered_map<std::string, size_t> &ref_to_position, bm::bvector<>::bulk_insert_iterator *it, std::vector<size_t> *reads_in_buffer) {
     // Reads a pseudoalignment line stored in the *Bifrost* format and returns the number of pseudoalignments on the line
     size_t n_refs = ref_to_position.size();
     char separator = '\t';
@@ -113,6 +117,7 @@ inline size_t MetagraphParser(const std::string &line, const std::unordered_map<
     std::string query_name;
     std::getline(stream, query_name, separator); // second column is the fragment name
     size_t read_id = query_to_position.at(query_name);
+    reads_in_buffer->push_back(read_id);
     size_t n_alignments = 0;
     std::getline(stream, part, separator); // Third column contains `:` separated alignments
     separator = ':';
@@ -127,7 +132,7 @@ inline size_t MetagraphParser(const std::string &line, const std::unordered_map<
     return n_alignments;
 }
 
-inline size_t SAMParser(const std::string &line, const std::unordered_map<std::string, size_t> &query_to_position, const std::unordered_map<std::string, size_t> &ref_to_position, bm::bvector<>::bulk_insert_iterator *it) {
+inline size_t SAMParser(const std::string &line, const std::unordered_map<std::string, size_t> &query_to_position, const std::unordered_map<std::string, size_t> &ref_to_position, bm::bvector<>::bulk_insert_iterator *it, std::vector<size_t> *reads_in_buffer) {
     // Reads a pseudoalignment line stored in the *Bifrost* format and returns the number of pseudoalignments on the line
     size_t n_refs = ref_to_position.size();
     char separator = '\t';
@@ -138,6 +143,7 @@ inline size_t SAMParser(const std::string &line, const std::unordered_map<std::s
     std::string query_name;
     std::getline(stream, query_name, separator);
     size_t read_id = query_to_position.at(query_name);
+    reads_in_buffer->push_back(read_id);
 
     // Second column contains the sam bitwise flags
     std::getline(stream, part, separator);
