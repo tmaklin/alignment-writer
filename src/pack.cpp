@@ -115,7 +115,7 @@ std::string QueryInfoToJSON(const std::unordered_map<size_t, std::string> &pos_t
 	json_string += '"';
 	json_string += ',';
 	json_string += "\"pos\":";
-	json_string += query_pos;
+	json_string += std::to_string(query_pos);
 	json_string += '}';
 	json_string += ((n_written == n_to_write - 1) ? ']' : ',');
 	++n_written;
