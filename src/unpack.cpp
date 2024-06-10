@@ -38,7 +38,6 @@
 #include <cmath>
 #include <sstream>
 #include <exception>
-#include <iostream>
 
 #include "nlohmann/json.hpp"
 #include "bmserial.h"
@@ -86,7 +85,7 @@ void ReadHeader(std::istream *in, size_t *n_reads, size_t *n_refs) {
     }
 
     if (!read_until_xz_end(in, &buffer)) {
-	throw std::runtime_error("Unexpected end of input.");	
+	throw std::runtime_error("Unexpected end of input.");
     }
 
     bxz::istream instr(&buffer);
@@ -107,7 +106,7 @@ std::stringbuf ReadBlockHeader(std::istream *in, size_t *block_size) {
     }
 
     if (!read_until_xz_end(in, &buffer)) {
-	throw std::runtime_error("Unexpected end of input.");	
+	throw std::runtime_error("Unexpected end of input.");
     }
 
     auto header_data = nlohmann::json_abi_v3_11_3::json::parse(bxz::istream(&buffer));
