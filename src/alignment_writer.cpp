@@ -134,7 +134,13 @@ int main(int argc, char* argv[]) {
 	return 1;
     }
 
-    const auto &args = opts.parse(argc, argv);
+    cxxopts::ParseResult args;
+    try {
+	args = opts.parse(argc, argv);
+    } catch (const cxxopts::exceptions::no_such_option &e) {
+	std::cerr << program_name + ": " << std::string(e.what()) << std::endl;
+	return 1;
+    }
 
     alignment_writer::Format format;
     if (args["format"].as<std::string>() == "themisto") {
