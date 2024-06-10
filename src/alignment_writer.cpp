@@ -308,7 +308,7 @@ int main(int argc, char* argv[]) {
 		    return 1;
 		}
 
-		bxz::ifstream in_stream(infile);
+		std::ifstream in_stream(infile);
 		if (args["stdout"].as<bool>()) {
 		    try {
 			alignment_writer::Print(&in_stream, &std::cout);
