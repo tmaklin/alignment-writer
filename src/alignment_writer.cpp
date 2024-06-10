@@ -134,7 +134,13 @@ int main(int argc, char* argv[]) {
 	return 1;
     }
 
-    const auto &args = opts.parse(argc, argv);
+    cxxopts::ParseResult args;
+    try {
+	args = opts.parse(argc, argv);
+    } catch (const cxxopts::exceptions::no_such_option &e) {
+	std::cerr << program_name + ": " << std::string(e.what()) << std::endl;
+	return 1;
+    }
 
     alignment_writer::Format format;
     if (args["format"].as<std::string>() == "themisto") {
@@ -174,7 +180,7 @@ int main(int argc, char* argv[]) {
 	// Compress from cin to cout
 	if (args["decompress"].as<bool>()) {
 	    try {
-		alignment_writer::Print(&std::cin, &std::cout);
+		alignment_writer::Print(format, &std::cin, &std::cout);
 	    } catch (const std::exception &e) {
 		std::cerr << program_name + ": error in reading compressed data from terminal: " << e.what() << std::endl;
 		return 1;
@@ -311,7 +317,7 @@ int main(int argc, char* argv[]) {
 		std::ifstream in_stream(infile);
 		if (args["stdout"].as<bool>()) {
 		    try {
-			alignment_writer::Print(&in_stream, &std::cout);
+			alignment_writer::Print(format, &in_stream, &std::cout);
 		    } catch (const std::exception &e) {
 			std::cerr << program_name + ": error in reading compressed file " + infile << ": " << e.what() << std::endl;
 			return 1;
@@ -319,7 +325,7 @@ int main(int argc, char* argv[]) {
 		} else {
 		    std::ofstream out_stream(outfile);
 		    try {
-			alignment_writer::Print(&in_stream, &out_stream);
+			alignment_writer::Print(format, &in_stream, &out_stream);
 		    } catch (const std::exception &e) {
 			std::cerr << program_name + ": error in decompressing file " + infile << " to file " << outfile << ": " << e.what() << std::endl;
 			return 1;
