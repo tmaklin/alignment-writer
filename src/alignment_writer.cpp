@@ -176,7 +176,7 @@ int main(int argc, char* argv[]) {
 	    try {
 		alignment_writer::Print(&std::cin, &std::cout);
 	    } catch (const std::exception &e) {
-		std::cerr << program_name + ": error in reading compressed data from terminal." << std::endl;
+		std::cerr << program_name + ": error in reading compressed data from terminal: " << e.what() << std::endl;
 		return 1;
 	    }
 	} else {
@@ -211,7 +211,7 @@ int main(int argc, char* argv[]) {
 	    try {
 		alignment_writer::BufferedPack(format, query_to_position, ref_to_position, args["buffer-size"].as<size_t>(), &std::cin, &std::cout);
 	    } catch (const std::exception &e) {
-		std::cerr << program_name + ": error in reading data from terminal." << std::endl;
+		std::cerr << program_name + ": error in reading data from terminal: " << e.what() << std::endl;
 		return 1;
 	    }
 	}
@@ -270,7 +270,7 @@ int main(int argc, char* argv[]) {
 		    try {
 			alignment_writer::BufferedPack(format, query_to_position, ref_to_position, args["buffer-size"].as<size_t>(), &in_stream, &out_stream);
 		    } catch (const std::exception &e) {
-			std::cerr << program_name + ": error in compressing file " << infile << " to file " << outfile << '.' << std::endl;
+			std::cerr << program_name + ": error in compressing file " << infile << " to file " << outfile << ": " << e.what() << std::endl;
 			return 1;
 		    }
 		} else {
@@ -278,7 +278,7 @@ int main(int argc, char* argv[]) {
 		    try {
 			alignment_writer::BufferedPack(format, query_to_position, ref_to_position, args["buffer-size"].as<size_t>(), &in_stream, &std::cout);
 		    } catch (const std::exception &e) {
-			std::cerr << program_name + ": error in compressing file " << infile << '.' << std::endl;
+			std::cerr << program_name + ": error in compressing file " << infile << ": " << e.what() << std::endl;
 			return 1;
 		    }
 		}
@@ -313,7 +313,7 @@ int main(int argc, char* argv[]) {
 		    try {
 			alignment_writer::Print(&in_stream, &std::cout);
 		    } catch (const std::exception &e) {
-			std::cerr << program_name + ": error in reading compressed file " + infile << '.' << std::endl;
+			std::cerr << program_name + ": error in reading compressed file " + infile << ": " << e.what() << std::endl;
 			return 1;
 		    }
 		} else {
@@ -321,7 +321,7 @@ int main(int argc, char* argv[]) {
 		    try {
 			alignment_writer::Print(&in_stream, &out_stream);
 		    } catch (const std::exception &e) {
-			std::cerr << program_name + ": error in decompressing file " + infile << " to file " << outfile << '.' << std::endl;
+			std::cerr << program_name + ": error in decompressing file " + infile << " to file " << outfile << ": " << e.what() << std::endl;
 			return 1;
 		    }
 		}
