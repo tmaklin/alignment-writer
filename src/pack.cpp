@@ -45,6 +45,8 @@
 #include "bmserial.h"
 #include "bxzstr.hpp"
 
+#include "parser.hpp"
+
 namespace alignment_writer {
 void CheckInput(const size_t n_refs, const size_t n_reads) {
     size_t aln_size = (size_t)(n_reads * n_refs);
@@ -53,7 +55,8 @@ void CheckInput(const size_t n_refs, const size_t n_reads) {
     }
 }
 
-void WriteHeader(const std::unordered_map<std::string, size_t> &query_to_position,
+void WriteHeader(const Format &format,
+		 const std::unordered_map<std::string, size_t> &query_to_position,
 		 const std::unordered_map<std::string, size_t> &ref_to_position,
 		 std::ostream *out) {
     // Write the header line of the packed format
@@ -65,6 +68,8 @@ void WriteHeader(const std::unordered_map<std::string, size_t> &query_to_positio
     lzma << "{";
     lzma << "\"n_queries\":" << n_reads << ',' << "\"n_targets\":" << n_refs;
     lzma << ',';
+    lzma << "\"input_format\":" << '"' << format_to_string(format) << '"';
+    lzma << ",";
     lzma << "\"targets\":[";
     size_t n_written = 0;
     for (auto kv : ref_to_position) {
@@ -123,7 +128,7 @@ std::string QueryInfoToJSON(const std::unordered_map<size_t, std::string> &pos_t
     json_string += '}';
     return json_string;
 }
-
+// TODO format in a stringbuf instead of writing directly (more general)
 void WriteBlock(const bm::bvector<> &bits, const std::string &query_info,
 		std::ostream *out, bm::serializer<bm::bvector<>> *bvs) {
     // Use serialization buffer class (automatic RAI, freed on destruction)
@@ -140,7 +145,7 @@ void BufferedPack(const Format &format, const std::unordered_map<std::string, si
     size_t n_reads = query_to_position.size();
     size_t n_refs = ref_to_position.size();
     CheckInput(n_refs, n_reads);
-    WriteHeader(query_to_position, ref_to_position, out);
+    WriteHeader(format, query_to_position, ref_to_position, out);
 
     // Next settings provide the lowest size (see BitMagic documentation/examples)
     bm::serializer<bm::bvector<>> bvs;
@@ -213,7 +218,7 @@ void Pack(const bm::bvector<> &bits, const std::unordered_map<std::string, size_
     // Pack a pseudoalignment that has been stored in memory
     // Write info about the pseudoalignment
     CheckInput(n_refs, n_reads);
-    WriteHeader(query_to_position, ref_to_position, out);
+    WriteHeader(themisto, query_to_position, ref_to_position, out);
 
     // Next settings provide the lowest size (see BitMagic documentation/examples)
     bm::serializer<bm::bvector<>> bvs;
