@@ -38,6 +38,7 @@
 #include <cmath>
 #include <sstream>
 #include <exception>
+#include <iostream>
 
 #include "nlohmann/json.hpp"
 #include "bmserial.h"
@@ -46,14 +47,46 @@
 #include "alignment-writer_openmp_config.hpp"
 
 namespace alignment_writer {
-void ReadHeader(std::istream *in, size_t *n_reads, size_t *n_refs) {
-    std::string first_line;
-    std::getline(*in, first_line);
-    size_t buffer_size = std::stoul(first_line);
+bool check_xz_header(std::istream *in, std::stringbuf *out) {
+    (*out) = std::stringbuf();
+    for (size_t i = 0; i < 6; ++i) {
+	out->sputc(in->get());
+    }
+    unsigned char b0 = out->str()[0];
+    unsigned char b1 = out->str()[1];
+    unsigned char b2 = out->str()[2];
+    unsigned char b3 = out->str()[3];
+    unsigned char b4 = out->str()[4];
+    unsigned char b5 = out->str()[5];
 
+    bool is_xz_header = (b0 == 0xFD && b1 == 0x37 && b2 == 0x7A
+			&& b3 == 0x58 && b4 == 0x5A && b5 == 0x00);
+    return is_xz_header;
+}
+
+bool read_until_xz_end(std::istream *in, std::stringbuf *out) {
+    bool stream_end = false;
+    while (!stream_end && in->good()) {
+	unsigned char next = in->get();
+	out->sputc(next);
+	if (next == 0x59) {
+	    // Possibly found stream end
+	    unsigned char nextnext = in->get();
+	    out->sputc(nextnext);
+	    stream_end = (nextnext == 0x5A);
+	}
+    }
+    return stream_end && in->good();
+}
+
+void ReadHeader(std::istream *in, size_t *n_reads, size_t *n_refs) {
     std::stringbuf buffer;
-    for (size_t i = 0; i < buffer_size; ++i) {
-	buffer.sputc(in->get());
+    if (!check_xz_header(in, &buffer)) {
+	throw std::runtime_error("Input file does not start with a .xz stream header.");
+    }
+
+    if (!read_until_xz_end(in, &buffer)) {
+	throw std::runtime_error("Unexpected end of input.");	
     }
 
     bxz::istream instr(&buffer);
@@ -67,17 +100,26 @@ nlohmann::json_abi_v3_11_3::json DeserializeBlockHeader(std::stringbuf &buffer) 
     return nlohmann::json_abi_v3_11_3::json::parse(instr);
 }
 
-std::stringbuf ReadBlockHeader(const std::string &line, std::istream *in, size_t *block_size) {
-    auto header_data = nlohmann::json_abi_v3_11_3::json::parse(line);
-    size_t header_buffer_size = (size_t)header_data["header_size"];
-
+std::stringbuf ReadBlockHeader(std::istream *in, size_t *block_size) {
     std::stringbuf buffer;
-    for (size_t i = 0; i < header_buffer_size; ++i) {
-	buffer.sputc(in->get());
+    if (!check_xz_header(in, &buffer)) {
+	throw std::runtime_error("Input file does not start with a .xz stream header.");
     }
 
+    if (!read_until_xz_end(in, &buffer)) {
+	throw std::runtime_error("Unexpected end of input.");	
+    }
+
+    auto header_data = nlohmann::json_abi_v3_11_3::json::parse(bxz::istream(&buffer));
+    size_t header_buffer_size = (size_t)header_data["header_size"];
     *block_size = (size_t)header_data["block_size"];
-    return buffer; // Use DeserializeBlockHeader to read contents is needed
+
+    std::stringbuf ret_buffer;
+    for (size_t i = 0; i < header_buffer_size; ++i) {
+	ret_buffer.sputc(in->get());
+    }
+
+    return ret_buffer; // Use DeserializeBlockHeader to read contents is needed
 }
 
 
@@ -95,9 +137,9 @@ std::basic_string<unsigned char> ReadBytes(const size_t bytes, std::istream *in)
     return std::basic_string<unsigned char>(buf, bytes);
 }
 
-void ReadBlock(const std::string &line, std::istream *in, bm::bvector<> *bits_out) {
+void ReadBlock(std::istream *in, bm::bvector<> *bits_out) {
     size_t block_size = 0;
-    ReadBlockHeader(line, in, &block_size);
+    ReadBlockHeader(in, &block_size);
     std::basic_string<unsigned char> buf = ReadBytes(block_size, in);
 
     // Deserialize block (OR with old data in bits)
@@ -114,8 +156,8 @@ void Print(std::istream *in, std::ostream *out) {
     bm::bvector<> bits(n_reads*n_refs, bm::BM_GAP);
 
     std::string line;
-    while (std::getline(*in, line)) {
-	ReadBlock(line, in, &bits);
+    while (in->good() && in->peek() != EOF) {
+	ReadBlock(in, &bits);
     }
 
     // Use an enumerator to traverse the pseudoaligned bits
@@ -146,7 +188,7 @@ void StreamingUnpack(std::istream *in, std::ostream *out) {
     std::string line;
     while (std::getline(*in, line)) { // Read size of next block
 	bm::bvector<> bits;
-	ReadBlock(line, in, &bits);
+	ReadBlock(in, &bits);
 
 	// Use an enumerator to traverse the pseudoaligned bits
 	bm::bvector<>::enumerator en = bits.first();
@@ -181,7 +223,7 @@ bm::bvector<> Unpack(std::istream *in, size_t *n_reads, size_t *n_refs) {
     bm::bvector<> bits((*n_reads)*(*n_refs));
     std::string line;
     while (std::getline(*in, line)) {
-	ReadBlock(line, in, &bits);
+	ReadBlock(in, &bits);
     }
 
     // Return the `n_reads x n_refs` contiguously stored matrix containing the pseudoalignment.
@@ -208,7 +250,7 @@ void ParallelUnpackData(std::istream *infile, bm::bvector<> &pseudoalignment) {
 
 	    // Read the block header
 	    size_t block_data_size = 0;
-	    ReadBlockHeader(next_line, infile, &block_data_size);
+	    ReadBlockHeader(infile, &block_data_size);
 
 	    // Read the block data
 	    std::basic_string<unsigned char> block_data = std::move(ReadBytes(block_data_size, infile));
