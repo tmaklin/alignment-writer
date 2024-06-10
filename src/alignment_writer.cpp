@@ -180,7 +180,7 @@ int main(int argc, char* argv[]) {
 	// Compress from cin to cout
 	if (args["decompress"].as<bool>()) {
 	    try {
-		alignment_writer::Print(&std::cin, &std::cout);
+		alignment_writer::Print(format, &std::cin, &std::cout);
 	    } catch (const std::exception &e) {
 		std::cerr << program_name + ": error in reading compressed data from terminal." << std::endl;
 		return 1;
@@ -317,15 +317,15 @@ int main(int argc, char* argv[]) {
 		bxz::ifstream in_stream(infile);
 		if (args["stdout"].as<bool>()) {
 		    try {
-			alignment_writer::Print(&in_stream, &std::cout);
+			alignment_writer::Print(format, &in_stream, &std::cout);
 		    } catch (const std::exception &e) {
-			std::cerr << program_name + ": error in reading compressed file " + infile << '.' << std::endl;
+			std::cerr << program_name + ": error in reading compressed file " + infile << ':' << e.what() << std::endl;
 			return 1;
 		    }
 		} else {
 		    std::ofstream out_stream(outfile);
 		    try {
-			alignment_writer::Print(&in_stream, &out_stream);
+			alignment_writer::Print(format, &in_stream, &out_stream);
 		    } catch (const std::exception &e) {
 			std::cerr << program_name + ": error in decompressing file " + infile << " to file " << outfile << '.' << std::endl;
 			return 1;

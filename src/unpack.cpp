@@ -46,7 +46,7 @@
 #include "alignment-writer_openmp_config.hpp"
 
 namespace alignment_writer {
-void ReadHeader(std::istream *in, size_t *n_reads, size_t *n_refs) {
+nlohmann::json_abi_v3_11_3::json ReadHeader(std::istream *in, size_t *n_reads, size_t *n_refs) {
     std::string first_line;
     std::getline(*in, first_line);
     size_t buffer_size = std::stoul(first_line);
@@ -60,6 +60,8 @@ void ReadHeader(std::istream *in, size_t *n_reads, size_t *n_refs) {
     nlohmann::json_abi_v3_11_3::json header = nlohmann::json_abi_v3_11_3::json::parse(instr);
     *n_reads = header["n_queries"];
     *n_refs = header["n_targets"];
+
+    return header;
 }
 
 nlohmann::json_abi_v3_11_3::json DeserializeBlockHeader(std::stringbuf &buffer) {
@@ -95,46 +97,52 @@ std::basic_string<unsigned char> ReadBytes(const size_t bytes, std::istream *in)
     return std::basic_string<unsigned char>(buf, bytes);
 }
 
-void ReadBlock(const std::string &line, std::istream *in, bm::bvector<> *bits_out) {
+nlohmann::json_abi_v3_11_3::json ReadBlock(const std::string &line, std::istream *in, bm::bvector<> *bits_out) {
     size_t block_size = 0;
-    ReadBlockHeader(line, in, &block_size);
+    std::stringbuf block_header = std::move(ReadBlockHeader(line, in, &block_size));
     std::basic_string<unsigned char> buf = ReadBytes(block_size, in);
 
     // Deserialize block (OR with old data in bits)
     bm::deserialize((*bits_out), buf.data());
+
+    return DeserializeBlockHeader(block_header);
 }
 
-void Print(std::istream *in, std::ostream *out) {
+void Print(const Format &format, std::istream *in, std::ostream *out) {
     // Read size of alignment from the file
     size_t n_reads;
     size_t n_refs;
-    ReadHeader(in, &n_reads, &n_refs);
+    const nlohmann::json_abi_v3_11_3::json &file_header = ReadHeader(in, &n_reads, &n_refs);
+    nlohmann::json_abi_v3_11_3::json block_headers;
 
     // Deserialize the buffer
     bm::bvector<> bits(n_reads*n_refs, bm::BM_GAP);
 
     std::string line;
+    bool first = true;
     while (std::getline(*in, line)) {
-	ReadBlock(line, in, &bits);
-    }
-
-    // Use an enumerator to traverse the pseudoaligned bits
-    bm::bvector<>::enumerator en = bits.first();
-    bm::bvector<>::enumerator en_end = bits.end();
-
-    for (size_t i = 0; i < n_reads; ++i) {
-	// Write read id (data compressed with Pack() is sorted so read id is just the iterator id)
-	*out << i << ' ';
-	if (*en < i*n_refs + n_refs) { // Next pseudoalignment is for this read
-	    // Write found pseudoalignments using the enumerator
-	    while (*en < i*n_refs + n_refs && en < en_end) {
-		*out<< (*en) - i*n_refs << ' ';
-		++en;
+	if (first) {
+	    block_headers = ReadBlock(line, in, &bits);
+	    first = false;
+	} else {
+	    auto block = ReadBlock(line, in, &bits);
+	    for (auto &item : block.items()) {
+		block_headers.find(item.key())->insert(block_headers.find(item.key())->end(), item.value().begin(), item.value().end());
 	    }
 	}
-	*out << '\n';
     }
-    out->flush(); // Flush
+
+    if (format == themisto) {
+	ThemistoPrinter(bits, file_header, block_headers, out);
+    } else if (format == fulgor) {
+	FulgorPrinter(bits, file_header, block_headers, out);
+    } else if (format == bifrost) {
+	BifrostPrinter(bits, file_header, block_headers, out);
+    } else if (format == metagraph) {
+	MetagraphPrinter(bits, file_header, block_headers, out);
+    } else if (format == sam) {
+	SAMPrinter(bits, file_header, block_headers, out);
+    }	
 }
 
 void StreamingUnpack(std::istream *in, std::ostream *out) {

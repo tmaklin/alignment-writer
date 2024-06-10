@@ -41,10 +41,11 @@
 #include <vector>
 
 #include "bm64.h"
+#include "parser.hpp"
 
 namespace alignment_writer {
 // Print data that has been written using BufferedPack
-void Print(std::istream *in, std::ostream *out);
+void Print(const Format &format, std::istream *in, std::ostream *out);
 void StreamingPrint(std::istream *in, std::ostream *out);
 
 // Read in pseudoalignment data written using BufferedPack
@@ -58,7 +59,7 @@ bm::bvector<> ParallelUnpack(std::istream *infile, size_t *n_reads, size_t *n_re
 void DeserializeBuffer(const size_t buffer_size, std::istream *in, bm::bvector<> *out);
 
 // Function for reading the header line of the alignment file
-void ReadHeader(std::istream *in, size_t *n_reads, size_t *n_refs);
+nlohmann::json_abi_v3_11_3::json ReadHeader(std::istream *in, size_t *n_reads, size_t *n_refs);
 }
 
 #endif
