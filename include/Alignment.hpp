@@ -64,7 +64,7 @@ public:
 	this->n_queries = _n_queries;
 	this->n_targets = _targets_names.size();
 	this->targets_names = _targets_names;
-	this->bitvector = bm::bvector<>((size_t)(n_queries * n_targets));
+	this->bitvector = bm::bvector<>((size_t)(n_queries * n_targets), bm::BM_GAP);
     }
 
     Alignment(size_t _n_queries, const std::unordered_map<std::string, size_t>& _targets_names_to_pos) {
@@ -74,7 +74,7 @@ public:
 	for (auto kv : _targets_names_to_pos) {
 	    this->targets_names[kv.second] = kv.first;
 	}
-	this->bitvector = bm::bvector<>((size_t)(n_queries * n_targets));
+	this->bitvector = bm::bvector<>((size_t)(n_queries * n_targets), bm::BM_GAP);
     }
 
     Alignment(const json& file_header) {
@@ -84,7 +84,7 @@ public:
 	for (auto kv : file_header["targets"]) {
 	    this->targets_names[kv["pos"]] = kv["target"];
 	}
-	this->bitvector = bm::bvector<>((size_t)(this->n_queries * this->n_targets));
+	this->bitvector = bm::bvector<>((size_t)(this->n_queries * this->n_targets), bm::BM_GAP);
 	this->format = file_header["input_format"];
     }
 
