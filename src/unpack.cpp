@@ -45,6 +45,7 @@
 
 #include "alignment-writer_openmp_config.hpp"
 
+#include "Alignment.hpp"
 #include "printer.hpp"
 
 namespace alignment_writer {
@@ -152,11 +153,11 @@ void Print(const Format &format, std::istream *in, std::ostream *out) {
     // Deserialize the buffer
     std::string line;
     bool first = true;
-    bm::bvector<> bits(n_reads*n_refs);
+    Alignment bits(file_header);
     while (in->good() && in->peek() != EOF) {
 	std::stringbuf header = std::move(ReadBlock(in, &bits));
 	auto block_headers = DeserializeBlockHeader(header);
-	printer.write(bits, file_header, block_headers, out);
+	printer.write(bits, block_headers, out);
 	bits.clear();
     }
 }
@@ -164,11 +165,9 @@ void Print(const Format &format, std::istream *in, std::ostream *out) {
 bm::bvector<> Unpack(std::istream *in, size_t *n_reads, size_t *n_refs) {
     // Read the number of reads and reference sequences from the first line
     const auto &file_header = alignment_writer::ReadHeader(in);
-    *n_reads = file_header["n_queries"];
-    *n_refs = file_header["n_targets"];
 
     // Read the chunks into `pseudoalignment`
-    bm::bvector<> bits((*n_reads)*(*n_refs));
+    Alignment bits(file_header);
     std::string line;
     while (std::getline(*in, line)) {
 	ReadBlock(in, &bits);
@@ -177,7 +176,7 @@ bm::bvector<> Unpack(std::istream *in, size_t *n_reads, size_t *n_refs) {
     // Return the `n_reads x n_refs` contiguously stored matrix containing the pseudoalignment.
     // The pseudoalignment for the `n`th read against the `k`th reference sequence is contained
     // at position `n*n_refs + k` assuming indexing starts at 0.
-    return bits;
+    return bits.raw();
 }
 
 void ParallelUnpackData(std::istream *infile, bm::bvector<> &pseudoalignment) {
@@ -234,15 +233,13 @@ void ParallelUnpackData(std::istream *infile, bm::bvector<> &pseudoalignment) {
 bm::bvector<> ParallelUnpack(std::istream *infile, size_t *n_reads, size_t *n_refs) {
     // Read the number of reads and reference sequences from the first line
     const auto &file_header = alignment_writer::ReadHeader(infile);
-    *n_reads = file_header["n_queries"];
-    *n_refs = file_header["n_targets"];
 
-    bm::bvector<> pseudoalignment((*n_reads)*(*n_refs));
+    Alignment pseudoalignment(file_header);
     ParallelUnpackData(infile, pseudoalignment);
 
     // Return the `n_reads x n_refs` contiguously stored matrix containing the pseudoalignment.
     // The pseudoalignment for the `n`th read against the `k`th reference sequence is contained
     // at position `n*n_refs + k` assuming indexing starts at 0.
-    return pseudoalignment;
+    return pseudoalignment.raw();
 }
 }

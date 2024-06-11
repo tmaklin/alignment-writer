@@ -46,13 +46,14 @@
 #include "bm64.h"
 #include "nlohmann/json.hpp"
 
+#include "Alignment.hpp"
 #include "version.h"
 
 namespace alignment_writer {
 
-inline void ThemistoPrinter(const bm::bvector<> &bits, const nlohmann::json_abi_v3_11_3::json &header, const nlohmann::json_abi_v3_11_3::json &block_headers, std::ostream *out) {
-    size_t n_reads = header["n_queries"];
-    size_t n_refs = header["n_targets"];
+inline void ThemistoPrinter(const Alignment &bits, const nlohmann::json_abi_v3_11_3::json &block_headers, std::ostream *out) {
+    size_t n_reads = bits.queries();
+    size_t n_refs = bits.targets();
 
     // Use an enumerator to traverse the pseudoaligned bits
     bm::bvector<>::enumerator en = bits.first();
@@ -73,9 +74,9 @@ inline void ThemistoPrinter(const bm::bvector<> &bits, const nlohmann::json_abi_
     out->flush(); // Flush
 }
 
-inline void FulgorPrinter(const bm::bvector<> &bits, const nlohmann::json_abi_v3_11_3::json &header, const nlohmann::json_abi_v3_11_3::json &block_headers, std::ostream *out) {
-    size_t n_reads = header["n_queries"];
-    size_t n_refs = header["n_targets"];
+inline void FulgorPrinter(const Alignment &bits, const nlohmann::json_abi_v3_11_3::json &block_headers, std::ostream *out) {
+    size_t n_reads = bits.queries();
+    size_t n_refs = bits.targets();
 
     // Use an enumerator to traverse the pseudoaligned bits
     bm::bvector<>::enumerator en = bits.first();
@@ -110,9 +111,9 @@ inline void FulgorPrinter(const bm::bvector<> &bits, const nlohmann::json_abi_v3
     out->flush(); // Flush
 }
 
-inline void BifrostPrinter(const bm::bvector<> &bits, const nlohmann::json_abi_v3_11_3::json &header, const nlohmann::json_abi_v3_11_3::json &block_headers, std::ostream *out) {
-    size_t n_reads = header["n_queries"];
-    size_t n_refs = header["n_targets"];
+inline void BifrostPrinter(const Alignment &bits, const nlohmann::json_abi_v3_11_3::json &block_headers, std::ostream *out) {
+    size_t n_reads = bits.queries();
+    size_t n_refs = bits.targets();
 
     // Use an enumerator to traverse the pseudoaligned bits
     bm::bvector<>::enumerator en = bits.first();
@@ -124,11 +125,7 @@ inline void BifrostPrinter(const bm::bvector<> &bits, const nlohmann::json_abi_v
 	query_map.insert(std::make_pair(kv["pos"], kv["query"]));
     }
 
-    std::vector<std::string> targets(n_refs);
-    for (size_t i = 0; i < n_refs; ++i) {
-	size_t pos = header["targets"].at(i)["pos"];
-	targets[pos] = header["targets"].at(i)["target"];
-    }
+    const std::vector<std::string> &targets = bits.target_names();
 
     *out << "query_name" << '\t';
     for (size_t i = 0; i < n_refs; ++i) {
@@ -152,9 +149,9 @@ inline void BifrostPrinter(const bm::bvector<> &bits, const nlohmann::json_abi_v
     out->flush(); // Flush
 }
 
-inline void MetagraphPrinter(const bm::bvector<> &bits, const nlohmann::json_abi_v3_11_3::json &header, const nlohmann::json_abi_v3_11_3::json &block_headers, std::ostream *out) {
-    size_t n_reads = header["n_queries"];
-    size_t n_refs = header["n_targets"];
+inline void MetagraphPrinter(const Alignment &bits, const nlohmann::json_abi_v3_11_3::json &block_headers, std::ostream *out) {
+    size_t n_reads = bits.queries();
+    size_t n_refs = bits.targets();
 
     // Use an enumerator to traverse the pseudoaligned bits
     bm::bvector<>::enumerator en = bits.first();
@@ -168,9 +165,7 @@ inline void MetagraphPrinter(const bm::bvector<> &bits, const nlohmann::json_abi
 
     std::unordered_map<size_t, std::string> target_map;
     for (size_t i = 0; i < n_refs; ++i) {
-	size_t pos = header["targets"].at(i)["pos"];
-	std::string target = header["targets"].at(i)["target"];
-	target_map.insert(std::make_pair(pos, target));
+	target_map.insert(std::make_pair(i, bits.target_names()[i]));
     }
 
     for (auto query : query_map) {
@@ -192,9 +187,9 @@ inline void MetagraphPrinter(const bm::bvector<> &bits, const nlohmann::json_abi
     out->flush(); // Flush
 }
 
-inline void SAMPrinter(const bm::bvector<> &bits, const nlohmann::json_abi_v3_11_3::json &header, const nlohmann::json_abi_v3_11_3::json &block_headers, std::ostream *out) {
-    size_t n_reads = header["n_queries"];
-    size_t n_refs = header["n_targets"];
+inline void SAMPrinter(const Alignment &bits, const nlohmann::json_abi_v3_11_3::json &block_headers, std::ostream *out) {
+    size_t n_reads = bits.queries();
+    size_t n_refs = bits.targets();
 
     // Use an enumerator to traverse the pseudoaligned bits
     bm::bvector<>::enumerator en = bits.first();
@@ -208,15 +203,13 @@ inline void SAMPrinter(const bm::bvector<> &bits, const nlohmann::json_abi_v3_11
 
     std::unordered_map<size_t, std::string> target_map;
     for (size_t i = 0; i < n_refs; ++i) {
-	size_t pos = header["targets"].at(i)["pos"];
-	std::string target = header["targets"].at(i)["target"];
-	target_map.insert(std::make_pair(pos, target));
+	target_map.insert(std::make_pair(i, bits.target_names()[i]));
     }
 
     for (size_t i = 0; i < n_refs; ++i) {
 	*out << "@SQ" << '\t' << "SN:" << target_map.at(i) << '\n';
     }
-    *out << "@PG" << '\t' << "ID:" << std::string(header["input_format"]) << '\t' << "PN:alignment-writer" << '\t' << "VN:" << ALIGNMENT_WRITER_BUILD_VERSION << '\n';
+    *out << "@PG" << '\t' << "ID:" << std::string(bits.input_format()) << '\t' << "PN:alignment-writer" << '\t' << "VN:" << ALIGNMENT_WRITER_BUILD_VERSION << '\n';
 
     for (size_t i = 0; i < n_reads; ++i) {
 	std::vector<size_t> targets;
@@ -258,7 +251,7 @@ public:
 	}
     }
 
-    std::function<void(const bm::bvector<> &bits, const nlohmann::json_abi_v3_11_3::json &header, const nlohmann::json_abi_v3_11_3::json &block_headers, std::ostream *out)> write;
+    std::function<void(Alignment &bits, const nlohmann::json_abi_v3_11_3::json &block_headers, std::ostream *out)> write;
 };
 }
 

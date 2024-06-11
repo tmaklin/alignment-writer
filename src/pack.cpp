@@ -47,6 +47,7 @@
 #include "nlohmann/json.hpp"
 
 #include "parser.hpp"
+#include "Alignment.hpp"
 
 namespace alignment_writer {
 using json = nlohmann::json_abi_v3_11_3::json;
@@ -163,7 +164,7 @@ void BufferedPack(const Format &format, const std::unordered_map<std::string, si
     bvs.byte_order_serialization(false);
     bvs.gap_length_serialization(false);
 
-    bm::bvector<> bits;
+    Alignment bits(n_reads, ref_to_position);
     bits.set_new_blocks_strat(bm::BM_GAP);
     bm::bvector<>::bulk_insert_iterator it(bits);
 
