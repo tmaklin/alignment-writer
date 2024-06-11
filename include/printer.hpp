@@ -182,7 +182,7 @@ inline std::stringbuf MetagraphPrinter(const Alignment &bits) {
 	out += '\t';
 	out += query.second;
 	out += '\t';
-	if (en != en_end && *en < query.first*n_refs + n_refs) { // Next pseudoalignment is for this read
+	if (*en < query.first*n_refs + n_refs) { // Next pseudoalignment is for this read
 	    // Write found pseudoalignments using the enumerator
 	    bool first = true;
 	    while (*en < query.first*n_refs + n_refs && en < en_end) {
@@ -274,7 +274,7 @@ public:
 	}
     }
 
-    std::function<std::stringbuf(Alignment &bits)> format;
+    std::function<std::stringbuf(const Alignment &bits)> format;
 };
 }
 
