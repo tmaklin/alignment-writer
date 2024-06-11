@@ -146,6 +146,9 @@ void Print(const Format &format, std::istream *in, std::ostream *out) {
     size_t n_reads = file_header["n_queries"];
     size_t n_refs = file_header["n_targets"];
 
+    // Initialize formatter
+    Printer printer(format);
+
     // Deserialize the buffer
     std::string line;
     bool first = true;
@@ -153,17 +156,7 @@ void Print(const Format &format, std::istream *in, std::ostream *out) {
     while (in->good() && in->peek() != EOF) {
 	std::stringbuf header = std::move(ReadBlock(in, &bits));
 	auto block_headers = DeserializeBlockHeader(header);
-	if (format == themisto) {
-	    ThemistoPrinter(bits, file_header, block_headers, out);
-	} else if (format == fulgor) {
-	    FulgorPrinter(bits, file_header, block_headers, out);
-	} else if (format == bifrost) {
-	    BifrostPrinter(bits, file_header, block_headers, out);
-	} else if (format == metagraph) {
-	    MetagraphPrinter(bits, file_header, block_headers, out);
-	} else if (format == sam) {
-	    SAMPrinter(bits, file_header, block_headers, out);
-	}
+	printer.write(bits, file_header, block_headers, out);
 	bits.clear();
     }
 }

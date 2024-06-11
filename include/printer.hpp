@@ -41,6 +41,7 @@
 #include <map>
 #include <sstream>
 #include <unordered_set>
+#include <functional>
 
 #include "bm64.h"
 #include "nlohmann/json.hpp"
@@ -240,6 +241,25 @@ inline void SAMPrinter(const bm::bvector<> &bits, const nlohmann::json_abi_v3_11
     }
     out->flush(); // Flush
 }
+
+class Printer {
+public:
+    Printer(const Format &_format) {
+	if (_format == themisto) {
+	    this->write = ThemistoPrinter;
+	} else if (_format == fulgor) {
+	    this->write = FulgorPrinter;
+	} else if (_format == bifrost) {
+	    this->write = BifrostPrinter;
+	} else if (_format == metagraph) {
+	    this->write = MetagraphPrinter;
+	} else if (_format == sam) {
+	    this->write = SAMPrinter;
+	}
+    }
+
+    std::function<void(const bm::bvector<> &bits, const nlohmann::json_abi_v3_11_3::json &header, const nlohmann::json_abi_v3_11_3::json &block_headers, std::ostream *out)> write;
+};
 }
 
 #endif
