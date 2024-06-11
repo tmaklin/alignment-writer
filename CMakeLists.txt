@@ -178,7 +178,21 @@ else()
 endif()
 include_directories(${CMAKE_CXXOPTS_HEADERS})
 
-# Link libraries
-if (OPENMP_FOUND)
-  target_link_libraries(libalignmentwriter OpenMP::OpenMP_CXX)
+### BS_thread_pool
+if (DEFINED CMAKE_BS_THREAD_POOL_HEADERS)
+  message(STATUS "BS_thread_pool headers provided in: ${CMAKE_BS_THREAD_POOL_HEADERS}")
+else()
+  FetchContent_Declare(bs_thread_pool
+    GIT_REPOSITORY    https://github.com/bshoshany/thread-pool
+    GIT_TAG           v3.5.0
+    PREFIX            "external"
+    SOURCE_DIR        "${CMAKE_CURRENT_SOURCE_DIR}/external/bs_thread_pool"
+    BUILD_IN_SOURCE   0
+    BUILD_COMMAND     ""
+    CONFIGURE_COMMAND ""
+    INSTALL_COMMAND   ""
+    )
+  FetchContent_MakeAvailable(bs_thread_pool)
+  set(CMAKE_BS_THREAD_POOL_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/external/bs_thread_pool/include)
 endif()
+include_directories(${CMAKE_BS_THREAD_POOL_HEADERS})
