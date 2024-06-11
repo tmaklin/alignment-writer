@@ -141,16 +141,13 @@ std::stringbuf ReadBlock(std::istream *in, bm::bvector<> *bits_out) {
     return block_header;
 }
 
-void Print(const Format &format, std::istream *in, std::ostream *out) {
+Alignment DecompressStream(std::istream *in) {
     // Read size of alignment from the file
     const nlohmann::json_abi_v3_11_3::json &file_header = ReadHeader(in);
     size_t n_reads = file_header["n_queries"];
     size_t n_refs = file_header["n_targets"];
 
-    // Initialize formatter
-    Printer printer(format);
-
-    // Deserialize the buffer
+    // Consume stream
     std::string line;
     bool first = true;
     Alignment bits(file_header);
@@ -158,27 +155,20 @@ void Print(const Format &format, std::istream *in, std::ostream *out) {
 	std::stringbuf header = std::move(ReadBlock(in, &bits));
 	auto block_headers = DeserializeBlockHeader(header);
 	bits.annotate(block_headers);
-	const std::stringbuf &ret = printer.format(bits);
-	*out << ret.str();
-	bits.clear(false);
     }
+    return bits;
 }
 
-bm::bvector<> Unpack(std::istream *in, size_t *n_reads, size_t *n_refs) {
-    // Read the number of reads and reference sequences from the first line
-    const auto &file_header = alignment_writer::ReadHeader(in);
+void Print(const Format &format, std::istream *in, std::ostream *out) {
+    // Deserialize the file
+    const Alignment &alignment = DecompressStream(in);
 
-    // Read the chunks into `pseudoalignment`
-    Alignment bits(file_header);
-    std::string line;
-    while (std::getline(*in, line)) {
-	ReadBlock(in, &bits);
-    }
+    // Initialize formatter
+    Printer printer(format);
 
-    // Return the `n_reads x n_refs` contiguously stored matrix containing the pseudoalignment.
-    // The pseudoalignment for the `n`th read against the `k`th reference sequence is contained
-    // at position `n*n_refs + k` assuming indexing starts at 0.
-    return bits.raw();
+    // Print results
+    const std::stringbuf &ret = printer.format(alignment);
+    *out << ret.str();
 }
 
 void ParallelUnpackData(std::istream *infile, bm::bvector<> &pseudoalignment) {
