@@ -29,20 +29,6 @@ set_target_properties(libalignmentwriter PROPERTIES OUTPUT_NAME alignment-writer
 add_executable(alignment-writer ${CMAKE_CURRENT_SOURCE_DIR}/src/alignment_writer.cpp)
 target_link_libraries(alignment-writer libalignmentwriter)
 
-## Check dependencies
-find_package(OpenMP)
-if (OPENMP_FOUND)
-  set(ALIGNMENTWRITER_OPENMP_SUPPORT 1)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_GLIBCXX_PARALLEL")
-  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -D_GLIBCXX_PARALLEL")
-  set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -D_GLIBCXX_PARALLEL")
-else()
-  set(ALIGNMENTWRITER_OPENMP_SUPPORT 0)
-endif()
-
-## Configure OpenMP if it is supported on the system.
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/include/alignment-writer_openmp_config.hpp.in ${CMAKE_CURRENT_BINARY_DIR}/include/alignment-writer_openmp_config.hpp @ONLY)
-
 ## Own header files
 set(CMAKE_ALIGNMENT_WRITER_HEADERS ${CMAKE_CURRENT_BINARY_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/include)
 include_directories(${CMAKE_ALIGNMENT_WRITER_HEADERS})
