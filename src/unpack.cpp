@@ -157,9 +157,10 @@ void Print(const Format &format, std::istream *in, std::ostream *out) {
     while (in->good() && in->peek() != EOF) {
 	std::stringbuf header = std::move(ReadBlock(in, &bits));
 	auto block_headers = DeserializeBlockHeader(header);
-	const std::stringbuf &ret = printer.format(bits, block_headers);
+	bits.annotate(block_headers);
+	const std::stringbuf &ret = printer.format(bits);
 	*out << ret.str();
-	bits.clear();
+	bits.clear(false);
     }
 }
 

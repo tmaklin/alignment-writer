@@ -50,7 +50,7 @@
 #include "version.h"
 
 namespace alignment_writer {
-inline std::stringbuf ThemistoPrinter(const Alignment &bits, const nlohmann::json_abi_v3_11_3::json &query_metadata) {
+inline std::stringbuf ThemistoPrinter(const Alignment &bits) {
     size_t n_reads = bits.queries();
     size_t n_refs = bits.targets();
 
@@ -58,6 +58,7 @@ inline std::stringbuf ThemistoPrinter(const Alignment &bits, const nlohmann::jso
     bm::bvector<>::enumerator en = bits.first();
     bm::bvector<>::enumerator en_end = bits.end();
 
+    std::string out;
     for (size_t i = 0; i < n_reads; ++i) {
 	// Write read id (data compressed with Pack() is sorted so read id is just the iterator id)
 	out += std::to_string(i);
@@ -75,7 +76,7 @@ inline std::stringbuf ThemistoPrinter(const Alignment &bits, const nlohmann::jso
     return std::stringbuf(out);
 }
 
-inline std::stringbuf FulgorPrinter(const Alignment &bits, const nlohmann::json_abi_v3_11_3::json &query_metadata) {
+inline std::stringbuf FulgorPrinter(const Alignment &bits) {
     size_t n_reads = bits.queries();
     size_t n_refs = bits.targets();
 
@@ -83,9 +84,8 @@ inline std::stringbuf FulgorPrinter(const Alignment &bits, const nlohmann::json_
     bm::bvector<>::enumerator en = bits.first();
     bm::bvector<>::enumerator en_end = bits.end();
 
-    nlohmann::json_abi_v3_11_3::json query_info = query_metadata["queries"];
     std::unordered_map<size_t, std::string> query_map;
-    for (auto kv : query_info) {
+    for (auto kv : bits.annotation()) {
 	query_map.insert(std::make_pair(kv["pos"], kv["query"]));
     }
 
@@ -116,7 +116,7 @@ inline std::stringbuf FulgorPrinter(const Alignment &bits, const nlohmann::json_
     return std::stringbuf(out);
 }
 
-inline std::stringbuf BifrostPrinter(const Alignment &bits, const nlohmann::json_abi_v3_11_3::json &query_metadata) {
+inline std::stringbuf BifrostPrinter(const Alignment &bits) {
     size_t n_reads = bits.queries();
     size_t n_refs = bits.targets();
 
@@ -124,9 +124,8 @@ inline std::stringbuf BifrostPrinter(const Alignment &bits, const nlohmann::json
     bm::bvector<>::enumerator en = bits.first();
     bm::bvector<>::enumerator en_end = bits.end();
 
-    nlohmann::json_abi_v3_11_3::json query_info = query_metadata["queries"];
     std::unordered_map<size_t, std::string> query_map;
-    for (auto kv : query_info) {
+    for (auto kv : bits.annotation()) {
 	query_map.insert(std::make_pair(kv["pos"], kv["query"]));
     }
 
@@ -159,7 +158,7 @@ inline std::stringbuf BifrostPrinter(const Alignment &bits, const nlohmann::json
     return std::stringbuf(out);
 }
 
-inline std::stringbuf MetagraphPrinter(const Alignment &bits, const nlohmann::json_abi_v3_11_3::json &query_metadata) {
+inline std::stringbuf MetagraphPrinter(const Alignment &bits) {
     size_t n_reads = bits.queries();
     size_t n_refs = bits.targets();
 
@@ -167,9 +166,8 @@ inline std::stringbuf MetagraphPrinter(const Alignment &bits, const nlohmann::js
     bm::bvector<>::enumerator en = bits.first();
     bm::bvector<>::enumerator en_end = bits.end();
 
-    nlohmann::json_abi_v3_11_3::json query_info = query_metadata["queries"];
     std::map<size_t, std::string> query_map; // Need to iterate in order
-    for (auto kv : query_info) {
+    for (auto kv : bits.annotation()) {
 	query_map.insert(std::make_pair(kv["pos"], kv["query"]));
     }
 
@@ -184,7 +182,7 @@ inline std::stringbuf MetagraphPrinter(const Alignment &bits, const nlohmann::js
 	out += '\t';
 	out += query.second;
 	out += '\t';
-	if (*en < query.first*n_refs + n_refs) { // Next pseudoalignment is for this read
+	if (en != en_end && *en < query.first*n_refs + n_refs) { // Next pseudoalignment is for this read
 	    // Write found pseudoalignments using the enumerator
 	    bool first = true;
 	    while (*en < query.first*n_refs + n_refs && en < en_end) {
@@ -201,7 +199,7 @@ inline std::stringbuf MetagraphPrinter(const Alignment &bits, const nlohmann::js
     return std::stringbuf(out);
 }
 
-inline std::stringbuf SAMPrinter(const Alignment &bits, const nlohmann::json_abi_v3_11_3::json &query_metadata) {
+inline std::stringbuf SAMPrinter(const Alignment &bits) {
     size_t n_reads = bits.queries();
     size_t n_refs = bits.targets();
 
@@ -209,9 +207,8 @@ inline std::stringbuf SAMPrinter(const Alignment &bits, const nlohmann::json_abi
     bm::bvector<>::enumerator en = bits.first();
     bm::bvector<>::enumerator en_end = bits.end();
 
-    nlohmann::json_abi_v3_11_3::json query_info = query_metadata["queries"];
     std::unordered_map<size_t, std::string> query_map;
-    for (auto kv : query_info) {
+    for (auto kv : bits.annotation()) {
 	query_map.insert(std::make_pair(kv["pos"], kv["query"]));
     }
 
@@ -277,7 +274,7 @@ public:
 	}
     }
 
-    std::function<std::stringbuf(Alignment &bits, const nlohmann::json_abi_v3_11_3::json &query_metadata)> format;
+    std::function<std::stringbuf(Alignment &bits)> format;
 };
 }
 

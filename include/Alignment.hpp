@@ -49,10 +49,14 @@ using json = nlohmann::json_abi_v3_11_3::json;
 
 class Alignment : public bm::bvector<> {
 private:
+    // Must have these
     size_t n_queries;
     size_t n_targets;
     std::vector<std::string> targets_names;
     bm::bvector<> bitvector;
+
+    // May optionally have these
+    json query_metadata;
     std::string format;
 
 public:
@@ -84,14 +88,33 @@ public:
 	this->format = file_header["input_format"];
     }
 
+    // Annotate alignment based on metadata stored in the compressed block headers.
+    void annotate(const json &block_metadata) {
+	if (this->query_metadata.empty()) {
+	    this->query_metadata = block_metadata["queries"];
+	} else {
+	    this->query_metadata.insert(this->query_metadata.end(), block_metadata["queries"].begin(), block_metadata["queries"].end());
+	}
+    }
+
+    // Zero all alignments and delete info about queries
+    void clear(bool free_mem=true) { this->bitvector.clear(free_mem); this->query_metadata.clear(); }
+
+    // Get query annotation
+    const json& annotation() const { return this->query_metadata; }
+
+    // Get number of queries or targets
     const size_t queries() const { return this->n_queries; }
     const size_t targets() const { return this->n_targets; }
 
-    const std::vector<std::string> target_names() const { return this->targets_names; }
+    // Get names of pseudoalignment alignment targets
+    const std::vector<std::string>& target_names() const { return this->targets_names; }
 
-    const std::string input_format() const { return this->format; }
+    // Get original format the alignment was written in
+    const std::string& input_format() const { return this->format; }
 
-    const bm::bvector<> raw() const { return this->bitvector; }
+    // Get underlying BitMagic representation
+    const bm::bvector<>& raw() const { return this->bitvector; }
 };
 }
 
