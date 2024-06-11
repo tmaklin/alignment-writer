@@ -38,6 +38,7 @@
 #include <cstddef>
 #include <string>
 #include <unordered_map>
+#include <map>
 #include <sstream>
 #include <unordered_set>
 
@@ -256,7 +257,7 @@ inline void MetagraphPrinter(const bm::bvector<> &bits, const nlohmann::json_abi
     bm::bvector<>::enumerator en_end = bits.end();
 
     nlohmann::json_abi_v3_11_3::json query_info = block_headers["queries"];
-    std::unordered_map<size_t, std::string> query_map;
+    std::map<size_t, std::string> query_map; // Need to iterate in order
     for (auto kv : query_info) {
 	query_map.insert(std::make_pair(kv["pos"], kv["query"]));
     }
@@ -268,17 +269,17 @@ inline void MetagraphPrinter(const bm::bvector<> &bits, const nlohmann::json_abi
 	target_map.insert(std::make_pair(pos, target));
     }
 
-    for (size_t i = 0; i < n_reads; ++i) {
-	*out << i << '\t' << query_map.at(i) << '\t';
-	if (*en < i*n_refs + n_refs) { // Next pseudoalignment is for this read
+    for (auto query : query_map) {
+	*out << query.first << '\t' << query.second << '\t';
+	if (*en < query.first*n_refs + n_refs) { // Next pseudoalignment is for this read
 	    // Write found pseudoalignments using the enumerator
 	    bool first = true;
-	    while (*en < i*n_refs + n_refs && en < en_end) {
+	    while (*en < query.first*n_refs + n_refs && en < en_end) {
 		if (!first) {
 		    *out << ':';
 		}
 		first = false;
-		*out << target_map.at((*en) - i*n_refs);
+		*out << target_map.at((*en) - query.first*n_refs);
 		++en;
 	    }
 	}

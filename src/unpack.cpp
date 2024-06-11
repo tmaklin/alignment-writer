@@ -144,83 +144,26 @@ void Print(const Format &format, std::istream *in, std::ostream *out) {
     size_t n_reads = file_header["n_queries"];
     size_t n_refs = file_header["n_targets"];
 
-    nlohmann::json_abi_v3_11_3::json block_headers;
-
     // Deserialize the buffer
-    bm::bvector<> bits(n_reads*n_refs, bm::BM_GAP);
-
     std::string line;
     bool first = true;
+    bm::bvector<> bits(n_reads*n_refs);
     while (in->good() && in->peek() != EOF) {
-	if (first) {
-	    if (format != themisto) {
-		// Themisto format does not need information stored in the header
-		std::stringbuf header = std::move(ReadBlock(in, &bits));
-		block_headers = DeserializeBlockHeader(header);
-	    } else {
-		ReadBlock(in, &bits);
-	    }
-	    first = false;
-	} else {
-	    if (format != themisto) {
-		std::stringbuf header = std::move(ReadBlock(in, &bits));
-		auto block = DeserializeBlockHeader(header);
-		for (auto &item : block.items()) {
-		    block_headers.find(item.key())->insert(block_headers.find(item.key())->end(), item.value().begin(), item.value().end());
-		}
-	    } else {
-		ReadBlock(in, &bits);
-	    }
+	std::stringbuf header = std::move(ReadBlock(in, &bits));
+	auto block_headers = DeserializeBlockHeader(header);
+	if (format == themisto) {
+	    ThemistoPrinter(bits, file_header, block_headers, out);
+	} else if (format == fulgor) {
+	    FulgorPrinter(bits, file_header, block_headers, out);
+	} else if (format == bifrost) {
+	    BifrostPrinter(bits, file_header, block_headers, out);
+	} else if (format == metagraph) {
+	    MetagraphPrinter(bits, file_header, block_headers, out);
+	} else if (format == sam) {
+	    SAMPrinter(bits, file_header, block_headers, out);
 	}
+	bits.clear();
     }
-
-    if (format == themisto) {
-	ThemistoPrinter(bits, file_header, block_headers, out);
-    } else if (format == fulgor) {
-	FulgorPrinter(bits, file_header, block_headers, out);
-    } else if (format == bifrost) {
-	BifrostPrinter(bits, file_header, block_headers, out);
-    } else if (format == metagraph) {
-	MetagraphPrinter(bits, file_header, block_headers, out);
-    } else if (format == sam) {
-	SAMPrinter(bits, file_header, block_headers, out);
-    }
-}
-
-void StreamingUnpack(std::istream *in, std::ostream *out) {
-    // Read size of alignment from the file
-    const auto &file_header = ReadHeader(in);
-    size_t n_reads = file_header["n_queries"];
-    size_t n_refs = file_header["n_targets"];
-
-    std::string line;
-    while (std::getline(*in, line)) { // Read size of next block
-	bm::bvector<> bits;
-	ReadBlock(in, &bits);
-
-	// Use an enumerator to traverse the pseudoaligned bits
-	bm::bvector<>::enumerator en = bits.first();
-	bm::bvector<>::enumerator en_end = bits.end();
-
-	bool first = true;
-	while (en < en_end) {
-	    size_t read_id = std::floor((*en)/n_refs);
-	    if (!first) {
-		*out << read_id << ' ';
-	    }
-	    while (std::floor((*en)/n_refs) == read_id && en < en_end) {
-		if (first) {
-		    *out << read_id << ' ';
-		    first = false;
-		}
-		*out << (*en) - read_id*n_refs << ' ';
-		++en;
-	    }
-	    *out << '\n';
-	}
-    }
-
-    out->flush(); // Flush
 }
 
 bm::bvector<> Unpack(std::istream *in, size_t *n_reads, size_t *n_refs) {
