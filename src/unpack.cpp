@@ -128,15 +128,11 @@ std::basic_string<unsigned char> ReadBytes(const size_t bytes, std::istream *in)
     return std::basic_string<unsigned char>(buf, bytes);
 }
 
-std::stringbuf ReadBlock(std::istream *in, bm::bvector<> *bits_out) {
+std::basic_string<unsigned char> ReadBlock(std::istream *in, std::stringbuf *block_header) {
     size_t block_size = 0;
-    std::stringbuf block_header = std::move(ReadBlockHeader(in, &block_size));
-    std::basic_string<unsigned char> buf = ReadBytes(block_size, in);
-
-    // Deserialize block (OR with old data in bits)
-    bm::deserialize((*bits_out), buf.data());
-
-    return block_header;
+    (*block_header) = std::move(ReadBlockHeader(in, &block_size));
+    const std::basic_string<unsigned char> &buf = ReadBytes(block_size, in);
+    return buf;
 }
 
 Alignment DecompressStream(std::istream *in) {
@@ -150,9 +146,11 @@ Alignment DecompressStream(std::istream *in) {
     bool first = true;
     Alignment bits(file_header);
     while (in->good() && in->peek() != EOF) {
-	std::stringbuf header = std::move(ReadBlock(in, &bits));
-	auto block_headers = DeserializeBlockHeader(header);
+	std::stringbuf block_header_ser;
+	std::basic_string<unsigned char> buf = std::move(ReadBlock(in, &block_header_ser));
+	auto block_headers = DeserializeBlockHeader(block_header_ser);
 	bits.annotate(block_headers);
+	bm::deserialize(bits, buf.data());
     }
     return bits;
 }
