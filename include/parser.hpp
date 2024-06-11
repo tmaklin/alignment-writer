@@ -175,6 +175,25 @@ inline size_t SAMParser(const std::string &line, const std::unordered_map<std::s
 
     return 1;
 }
+
+class Parser {
+public:
+    Parser(const Format &_format) {
+	if (_format == themisto) {
+	    this->read = ThemistoParser;
+	} else if (_format == fulgor) {
+	    this->read = FulgorParser;
+	} else if (_format == bifrost) {
+	    this->read = BifrostParser;
+	} else if (_format == metagraph) {
+	    this->read = MetagraphParser;
+	} else if (_format == sam) {
+	    this->read = SAMParser;
+	}
+    }
+
+    std::function<size_t(const std::string &line, const std::unordered_map<std::string, size_t> &query_to_position, const std::unordered_map<std::string, size_t> &ref_to_position, bm::bvector<>::bulk_insert_iterator *it, std::unordered_set<size_t> *reads_in_buffer)> read;
+};
 }
 
 #endif

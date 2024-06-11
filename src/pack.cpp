@@ -172,27 +172,19 @@ void BufferedPack(const Format &format, const std::unordered_map<std::string, si
 	pos_to_query.insert(std::make_pair(kv.second, kv.first));
     }
 
-    std::function<size_t(const std::string &line, const std::unordered_map<std::string, size_t> &query_to_position, const std::unordered_map<std::string, size_t> &ref_to_position, bm::bvector<>::bulk_insert_iterator *it, std::unordered_set<size_t> *reads_in_buffer)> parser;
-    if (format == themisto) {
-	parser = ThemistoParser;
-    } else if (format == fulgor) {
-	parser = FulgorParser;
-    } else if (format == bifrost) {
+    Parser parser(format);
+
+    // Consume headers
+    if (format == bifrost) {
 	// Consume first line in Bifrost format (contains ref names)
 	std::string header;
 	std::getline(*in, header);
-	parser = BifrostParser;
-    } else if (format == metagraph) {
-	parser = MetagraphParser;
     } else if (format == sam) {
 	// Consume the header lines from the SAM format
 	std::string header;
 	while (in->peek() == '@') {
 	    std::getline(*in, header);
 	}
-	parser = SAMParser;
-    } else {
-	throw std::runtime_error("Unrecognized input format.");
     }
 
     size_t n_in_buffer = 0;
@@ -200,7 +192,7 @@ void BufferedPack(const Format &format, const std::unordered_map<std::string, si
     std::string line;
     while (std::getline(*in, line)) {
 	// Parse the line
-	n_in_buffer += parser(line, query_to_position, ref_to_position, &it, &reads_in_buffer);
+	n_in_buffer += parser.read(line, query_to_position, ref_to_position, &it, &reads_in_buffer);
 
 	if (n_in_buffer > buffer_size) {
   	    // Force flush on the inserter to ensure everything is saved
