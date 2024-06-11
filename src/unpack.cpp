@@ -145,13 +145,19 @@ Alignment DecompressStream(std::istream *in) {
     std::string line;
     bool first = true;
     Alignment bits(file_header);
+    std::vector<std::basic_string<unsigned char>> buffers;
     while (in->good() && in->peek() != EOF) {
 	std::stringbuf block_header_ser;
-	std::basic_string<unsigned char> buf = std::move(ReadBlock(in, &block_header_ser));
+	buffers.emplace_back(ReadBlock(in, &block_header_ser));
 	auto block_headers = DeserializeBlockHeader(block_header_ser);
 	bits.annotate(block_headers);
-	bm::deserialize(bits, buf.data());
     }
+
+    // Deserialize
+    for (auto buffer : buffers) {
+	bm::deserialize(bits, buffer.data());
+    }
+
     return bits;
 }
 
