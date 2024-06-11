@@ -50,8 +50,7 @@
 #include "version.h"
 
 namespace alignment_writer {
-
-inline void ThemistoPrinter(const Alignment &bits, const nlohmann::json_abi_v3_11_3::json &block_headers, std::ostream *out) {
+inline std::stringbuf ThemistoPrinter(const Alignment &bits, const nlohmann::json_abi_v3_11_3::json &query_metadata) {
     size_t n_reads = bits.queries();
     size_t n_refs = bits.targets();
 
@@ -61,20 +60,22 @@ inline void ThemistoPrinter(const Alignment &bits, const nlohmann::json_abi_v3_1
 
     for (size_t i = 0; i < n_reads; ++i) {
 	// Write read id (data compressed with Pack() is sorted so read id is just the iterator id)
-	*out << i << ' ';
+	out += std::to_string(i);
+	out += ' ';
 	if (*en < i*n_refs + n_refs) { // Next pseudoalignment is for this read
 	    // Write found pseudoalignments using the enumerator
 	    while (*en < i*n_refs + n_refs && en < en_end) {
-		*out<< (*en) - i*n_refs << ' ';
+		out += std::to_string((*en) - i*n_refs);
+		out += ' ';
 		++en;
 	    }
 	}
-	*out << '\n';
+	out += '\n';
     }
-    out->flush(); // Flush
+    return std::stringbuf(out);
 }
 
-inline void FulgorPrinter(const Alignment &bits, const nlohmann::json_abi_v3_11_3::json &block_headers, std::ostream *out) {
+inline std::stringbuf FulgorPrinter(const Alignment &bits, const nlohmann::json_abi_v3_11_3::json &query_metadata) {
     size_t n_reads = bits.queries();
     size_t n_refs = bits.targets();
 
@@ -82,13 +83,16 @@ inline void FulgorPrinter(const Alignment &bits, const nlohmann::json_abi_v3_11_
     bm::bvector<>::enumerator en = bits.first();
     bm::bvector<>::enumerator en_end = bits.end();
 
-    nlohmann::json_abi_v3_11_3::json query_info = block_headers["queries"];
+    nlohmann::json_abi_v3_11_3::json query_info = query_metadata["queries"];
     std::unordered_map<size_t, std::string> query_map;
     for (auto kv : query_info) {
 	query_map.insert(std::make_pair(kv["pos"], kv["query"]));
     }
+
+    std::string out;
     for (size_t i = 0; i < n_reads; ++i) {
-	*out << query_map.at(i) << '\t';
+	out += query_map.at(i);
+	out += '\t';
 	std::vector<size_t> mapped_targets;
 	if (*en < i*n_refs + n_refs) { // Next pseudoalignment is for this read
 	    // Write found pseudoalignments using the enumerator
@@ -98,20 +102,21 @@ inline void FulgorPrinter(const Alignment &bits, const nlohmann::json_abi_v3_11_
 	    }
 	}
 	size_t n_mapped = mapped_targets.size();
-	*out << n_mapped;
+	out += std::to_string(n_mapped);
 	if (n_mapped > 0) {
-	    *out << '\t';
+	    out += '\t';
 	    for (size_t i = 0; i < n_mapped; ++i) {
-		*out << mapped_targets[i] << ((i == n_mapped - 1) ? '\n' : '\t');
+		out += std::to_string(mapped_targets[i]);
+		out += ((i == n_mapped - 1) ? '\n' : '\t');
 	    }
 	} else {
-	    *out << '\n';
+	    out += '\n';
 	}
     }
-    out->flush(); // Flush
+    return std::stringbuf(out);
 }
 
-inline void BifrostPrinter(const Alignment &bits, const nlohmann::json_abi_v3_11_3::json &block_headers, std::ostream *out) {
+inline std::stringbuf BifrostPrinter(const Alignment &bits, const nlohmann::json_abi_v3_11_3::json &query_metadata) {
     size_t n_reads = bits.queries();
     size_t n_refs = bits.targets();
 
@@ -119,7 +124,7 @@ inline void BifrostPrinter(const Alignment &bits, const nlohmann::json_abi_v3_11
     bm::bvector<>::enumerator en = bits.first();
     bm::bvector<>::enumerator en_end = bits.end();
 
-    nlohmann::json_abi_v3_11_3::json query_info = block_headers["queries"];
+    nlohmann::json_abi_v3_11_3::json query_info = query_metadata["queries"];
     std::unordered_map<size_t, std::string> query_map;
     for (auto kv : query_info) {
 	query_map.insert(std::make_pair(kv["pos"], kv["query"]));
@@ -127,13 +132,17 @@ inline void BifrostPrinter(const Alignment &bits, const nlohmann::json_abi_v3_11
 
     const std::vector<std::string> &targets = bits.target_names();
 
-    *out << "query_name" << '\t';
+    std::string out;
+    out += "query_name";
+    out += '\t';
     for (size_t i = 0; i < n_refs; ++i) {
-	*out << targets[i] << ((i == n_refs - 1) ? '\n' : '\t');
+	out += targets[i];
+	out += ((i == n_refs - 1) ? '\n' : '\t');
     }
 
     for (size_t i = 0; i < n_reads; ++i) {
-	*out << query_map.at(i) << '\t';
+	out += query_map.at(i);
+	out += '\t';
 	std::vector<bool> alignment(n_refs, false);
 	if (*en < i*n_refs + n_refs) { // Next pseudoalignment is for this read
 	    // Write found pseudoalignments using the enumerator
@@ -143,13 +152,14 @@ inline void BifrostPrinter(const Alignment &bits, const nlohmann::json_abi_v3_11
 	    }
 	}
 	for (size_t j = 0; j < n_refs; ++j) {
-	    *out << (alignment[j] ? "1" : "0") << ((j == n_refs - 1) ? '\n' : '\t');
+	    out += (alignment[j] ? "1" : "0");
+	    out += ((j == n_refs - 1) ? '\n' : '\t');
 	}
     }
-    out->flush(); // Flush
+    return std::stringbuf(out);
 }
 
-inline void MetagraphPrinter(const Alignment &bits, const nlohmann::json_abi_v3_11_3::json &block_headers, std::ostream *out) {
+inline std::stringbuf MetagraphPrinter(const Alignment &bits, const nlohmann::json_abi_v3_11_3::json &query_metadata) {
     size_t n_reads = bits.queries();
     size_t n_refs = bits.targets();
 
@@ -157,7 +167,7 @@ inline void MetagraphPrinter(const Alignment &bits, const nlohmann::json_abi_v3_
     bm::bvector<>::enumerator en = bits.first();
     bm::bvector<>::enumerator en_end = bits.end();
 
-    nlohmann::json_abi_v3_11_3::json query_info = block_headers["queries"];
+    nlohmann::json_abi_v3_11_3::json query_info = query_metadata["queries"];
     std::map<size_t, std::string> query_map; // Need to iterate in order
     for (auto kv : query_info) {
 	query_map.insert(std::make_pair(kv["pos"], kv["query"]));
@@ -168,26 +178,30 @@ inline void MetagraphPrinter(const Alignment &bits, const nlohmann::json_abi_v3_
 	target_map.insert(std::make_pair(i, bits.target_names()[i]));
     }
 
+    std::string out;
     for (auto query : query_map) {
-	*out << query.first << '\t' << query.second << '\t';
+	out += std::to_string(query.first);
+	out += '\t';
+	out += query.second;
+	out += '\t';
 	if (*en < query.first*n_refs + n_refs) { // Next pseudoalignment is for this read
 	    // Write found pseudoalignments using the enumerator
 	    bool first = true;
 	    while (*en < query.first*n_refs + n_refs && en < en_end) {
 		if (!first) {
-		    *out << ':';
+		    out += ':';
 		}
 		first = false;
-		*out << target_map.at((*en) - query.first*n_refs);
+		out += target_map.at((*en) - query.first*n_refs);
 		++en;
 	    }
 	}
-	*out << '\n';
+	out += '\n';
     }
-    out->flush(); // Flush
+    return std::stringbuf(out);
 }
 
-inline void SAMPrinter(const Alignment &bits, const nlohmann::json_abi_v3_11_3::json &block_headers, std::ostream *out) {
+inline std::stringbuf SAMPrinter(const Alignment &bits, const nlohmann::json_abi_v3_11_3::json &query_metadata) {
     size_t n_reads = bits.queries();
     size_t n_refs = bits.targets();
 
@@ -195,7 +209,7 @@ inline void SAMPrinter(const Alignment &bits, const nlohmann::json_abi_v3_11_3::
     bm::bvector<>::enumerator en = bits.first();
     bm::bvector<>::enumerator en_end = bits.end();
 
-    nlohmann::json_abi_v3_11_3::json query_info = block_headers["queries"];
+    nlohmann::json_abi_v3_11_3::json query_info = query_metadata["queries"];
     std::unordered_map<size_t, std::string> query_map;
     for (auto kv : query_info) {
 	query_map.insert(std::make_pair(kv["pos"], kv["query"]));
@@ -206,10 +220,19 @@ inline void SAMPrinter(const Alignment &bits, const nlohmann::json_abi_v3_11_3::
 	target_map.insert(std::make_pair(i, bits.target_names()[i]));
     }
 
+    std::string out;
     for (size_t i = 0; i < n_refs; ++i) {
-	*out << "@SQ" << '\t' << "SN:" << target_map.at(i) << '\n';
+	out += "@SQ";
+	out += '\t';
+	out += "SN:";
+	out += target_map.at(i);
+	out += '\n';
     }
-    *out << "@PG" << '\t' << "ID:" << std::string(bits.input_format()) << '\t' << "PN:alignment-writer" << '\t' << "VN:" << ALIGNMENT_WRITER_BUILD_VERSION << '\n';
+    out += "@PG\tID:";
+    out += std::string(bits.input_format());
+    out += "\tPN:alignment-writer\tVN:";
+    out += ALIGNMENT_WRITER_BUILD_VERSION;
+    out += '\n';
 
     for (size_t i = 0; i < n_reads; ++i) {
 	std::vector<size_t> targets;
@@ -222,36 +245,39 @@ inline void SAMPrinter(const Alignment &bits, const nlohmann::json_abi_v3_11_3::
 	}
 	if (targets.size() > 0) {
 	    for (size_t j = 0; j < targets.size(); ++j) {
-		*out << query_map.at(i) << '\t' << "0" << '\t' << target_map.at(targets[j]) << '\t';
-		*out << "1" << '\t' << "255" << '\t' << '*' << '\t' << '*' << '\t' << '0' << '\t' << '0' << '\t';
-		*out << '*' << '\t' << '*' << '\n';
+		out += query_map.at(i);
+		out +="\t0\t";
+		out += target_map.at(targets[j]);
+		out += "\t'1\t255\t*\t*\t0\t0\t";
+		out += "*\t*\n";
 	    }
 	} else {
-	    *out << query_map.at(i) << '\t' << "0" << '\t' << '*' << '\t';
-	    *out << "0" << '\t' << "255" << '\t' << '*' << '\t' << '*' << '\t' << '0' << '\t' << '0' << '\t';
-	    *out << '*' << '\t' << '*' << '\n';
+	    out += query_map.at(i);
+	    out += "\t0\t*\t";
+	    out += "0\t255\t*\t*\t0\t0\t";
+	    out += "*\t*\n";
 	}
     }
-    out->flush(); // Flush
+    return std::stringbuf(out);
 }
 
 class Printer {
 public:
     Printer(const Format &_format) {
 	if (_format == themisto) {
-	    this->write = ThemistoPrinter;
+	    this->format = ThemistoPrinter;
 	} else if (_format == fulgor) {
-	    this->write = FulgorPrinter;
+	    this->format = FulgorPrinter;
 	} else if (_format == bifrost) {
-	    this->write = BifrostPrinter;
+	    this->format = BifrostPrinter;
 	} else if (_format == metagraph) {
-	    this->write = MetagraphPrinter;
+	    this->format = MetagraphPrinter;
 	} else if (_format == sam) {
-	    this->write = SAMPrinter;
+	    this->format = SAMPrinter;
 	}
     }
 
-    std::function<void(Alignment &bits, const nlohmann::json_abi_v3_11_3::json &block_headers, std::ostream *out)> write;
+    std::function<std::stringbuf(Alignment &bits, const nlohmann::json_abi_v3_11_3::json &query_metadata)> format;
 };
 }
 
