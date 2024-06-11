@@ -78,7 +78,7 @@ bool read_until_xz_end(std::istream *in, std::stringbuf *out) {
     return stream_end && in->good();
 }
 
-nlohmann::json_abi_v3_11_3::json ReadHeader(std::istream *in, size_t *n_reads, size_t *n_refs) {
+nlohmann::json_abi_v3_11_3::json ReadHeader(std::istream *in) {
     std::stringbuf buffer;
     if (!check_xz_header(in, &buffer)) {
 	throw std::runtime_error("Input file does not start with a .xz stream header.");
@@ -89,9 +89,7 @@ nlohmann::json_abi_v3_11_3::json ReadHeader(std::istream *in, size_t *n_reads, s
     }
 
     bxz::istream instr(&buffer);
-    nlohmann::json_abi_v3_11_3::json header = nlohmann::json_abi_v3_11_3::json::parse(instr);
-    *n_reads = header["n_queries"];
-    *n_refs = header["n_targets"];
+    const nlohmann::json_abi_v3_11_3::json &header = nlohmann::json_abi_v3_11_3::json::parse(instr);
 
     return header;
 }
@@ -102,16 +100,7 @@ nlohmann::json_abi_v3_11_3::json DeserializeBlockHeader(std::stringbuf &buffer) 
 }
 
 std::stringbuf ReadBlockHeader(std::istream *in, size_t *block_size) {
-    std::stringbuf buffer;
-    if (!check_xz_header(in, &buffer)) {
-	throw std::runtime_error("Input file does not start with a .xz stream header.");
-    }
-
-    if (!read_until_xz_end(in, &buffer)) {
-	throw std::runtime_error("Unexpected end of input.");
-    }
-
-    auto header_data = nlohmann::json_abi_v3_11_3::json::parse(bxz::istream(&buffer));
+    const auto &header_data = ReadHeader(in);
     size_t header_buffer_size = (size_t)header_data["header_size"];
     *block_size = (size_t)header_data["block_size"];
 
@@ -138,7 +127,7 @@ std::basic_string<unsigned char> ReadBytes(const size_t bytes, std::istream *in)
     return std::basic_string<unsigned char>(buf, bytes);
 }
 
-nlohmann::json_abi_v3_11_3::json ReadBlock(std::istream *in, bm::bvector<> *bits_out) {
+std::stringbuf ReadBlock(std::istream *in, bm::bvector<> *bits_out) {
     size_t block_size = 0;
     std::stringbuf block_header = std::move(ReadBlockHeader(in, &block_size));
     std::basic_string<unsigned char> buf = ReadBytes(block_size, in);
@@ -146,14 +135,15 @@ nlohmann::json_abi_v3_11_3::json ReadBlock(std::istream *in, bm::bvector<> *bits
     // Deserialize block (OR with old data in bits)
     bm::deserialize((*bits_out), buf.data());
 
-    return DeserializeBlockHeader(block_header);
+    return block_header;
 }
 
 void Print(const Format &format, std::istream *in, std::ostream *out) {
     // Read size of alignment from the file
-    size_t n_reads;
-    size_t n_refs;
-    const nlohmann::json_abi_v3_11_3::json &file_header = ReadHeader(in, &n_reads, &n_refs);
+    const nlohmann::json_abi_v3_11_3::json &file_header = ReadHeader(in);
+    size_t n_reads = file_header["n_queries"];
+    size_t n_refs = file_header["n_targets"];
+
     nlohmann::json_abi_v3_11_3::json block_headers;
 
     // Deserialize the buffer
@@ -163,12 +153,23 @@ void Print(const Format &format, std::istream *in, std::ostream *out) {
     bool first = true;
     while (in->good() && in->peek() != EOF) {
 	if (first) {
-	    block_headers = ReadBlock(in, &bits);
+	    if (format != themisto) {
+		// Themisto format does not need information stored in the header
+		std::stringbuf header = std::move(ReadBlock(in, &bits));
+		block_headers = DeserializeBlockHeader(header);
+	    } else {
+		ReadBlock(in, &bits);
+	    }
 	    first = false;
 	} else {
-	    auto block = ReadBlock(in, &bits);
-	    for (auto &item : block.items()) {
-		block_headers.find(item.key())->insert(block_headers.find(item.key())->end(), item.value().begin(), item.value().end());
+	    if (format != themisto) {
+		std::stringbuf header = std::move(ReadBlock(in, &bits));
+		auto block = DeserializeBlockHeader(header);
+		for (auto &item : block.items()) {
+		    block_headers.find(item.key())->insert(block_headers.find(item.key())->end(), item.value().begin(), item.value().end());
+		}
+	    } else {
+		ReadBlock(in, &bits);
 	    }
 	}
     }
@@ -188,9 +189,9 @@ void Print(const Format &format, std::istream *in, std::ostream *out) {
 
 void StreamingUnpack(std::istream *in, std::ostream *out) {
     // Read size of alignment from the file
-    size_t n_reads;
-    size_t n_refs;
-    ReadHeader(in, &n_reads, &n_refs);
+    const auto &file_header = ReadHeader(in);
+    size_t n_reads = file_header["n_queries"];
+    size_t n_refs = file_header["n_targets"];
 
     std::string line;
     while (std::getline(*in, line)) { // Read size of next block
@@ -224,7 +225,9 @@ void StreamingUnpack(std::istream *in, std::ostream *out) {
 
 bm::bvector<> Unpack(std::istream *in, size_t *n_reads, size_t *n_refs) {
     // Read the number of reads and reference sequences from the first line
-    alignment_writer::ReadHeader(in, n_reads, n_refs);
+    const auto &file_header = alignment_writer::ReadHeader(in);
+    *n_reads = file_header["n_queries"];
+    *n_refs = file_header["n_targets"];
 
     // Read the chunks into `pseudoalignment`
     bm::bvector<> bits((*n_reads)*(*n_refs));
@@ -292,7 +295,9 @@ void ParallelUnpackData(std::istream *infile, bm::bvector<> &pseudoalignment) {
 
 bm::bvector<> ParallelUnpack(std::istream *infile, size_t *n_reads, size_t *n_refs) {
     // Read the number of reads and reference sequences from the first line
-    alignment_writer::ReadHeader(infile, n_reads, n_refs);
+    const auto &file_header = alignment_writer::ReadHeader(infile);
+    *n_reads = file_header["n_queries"];
+    *n_refs = file_header["n_targets"];
 
     bm::bvector<> pseudoalignment((*n_reads)*(*n_refs));
     ParallelUnpackData(infile, pseudoalignment);
