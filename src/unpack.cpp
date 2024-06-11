@@ -45,6 +45,8 @@
 
 #include "alignment-writer_openmp_config.hpp"
 
+#include "printer.hpp"
+
 namespace alignment_writer {
 bool check_xz_header(std::istream *in, std::stringbuf *out) {
     (*out) = std::stringbuf();
