@@ -87,9 +87,9 @@ public:
     // Annotate alignment based on metadata stored in the compressed block headers.
     void annotate(const json &block_metadata) {
 	if (this->query_metadata.empty()) {
-	    this->query_metadata = block_metadata["queries"];
+	    this->query_metadata = block_metadata;
 	} else {
-	    this->query_metadata.insert(this->query_metadata.end(), block_metadata["queries"].begin(), block_metadata["queries"].end());
+	    this->query_metadata.insert(this->query_metadata.end(), block_metadata.begin(), block_metadata.end());
 	}
     }
 
