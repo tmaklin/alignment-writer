@@ -35,31 +35,41 @@
 #ifndef ALIGNMENT_WRITER_UNPACK_HPP
 #define ALIGNMENT_WRITER_UNPACK_HPP
 
-#include <cstddef>
 #include <istream>
 #include <ostream>
-#include <vector>
+#include <cstddef>
+#include <string>
 
 #include "bm64.h"
+
+#include "Alignment.hpp"
 #include "parser.hpp"
 
 namespace alignment_writer {
-// Print data that has been written using BufferedPack
+
+// Read compressed files
+//
+// Print compressed data to std::ostream
 void Print(const Format &format, std::istream *in, std::ostream *out, size_t n_threads=1);
-void StreamingPrint(std::istream *in, std::ostream *out);
+//
+// Read compressed data into memory
+Alignment Read(std::istream *in, size_t n_threads=1);
 
-// Read in pseudoalignment data written using BufferedPack
-void UnpackData(std::istream *infile, bm::bvector<> &pseudoalignment);
-bm::bvector<> Unpack(std::istream *infile, size_t *n_reads, size_t *n_refs);
-// Parallel read
-void ParallelUnpackData(std::istream *infile, bm::bvector<> &pseudoalignment);
-bm::bvector<> ParallelUnpack(std::istream *infile, size_t *n_reads, size_t *n_refs);
 
-// Deserialize one section of data written with BufferedPack
-void DeserializeBuffer(const size_t buffer_size, std::istream *in, bm::bvector<> *out);
+// Read parts (blocks) from compressed files
+//
+// Read and decompress file or block header
+std::basic_string<char> ReadHeader(std::istream *in);
+//
+// Read the bytes comprising a block
+void ReadBlock(std::istream *in, std::basic_string<unsigned char> *block_header, std::basic_string<unsigned char> *block);
+//
+// Decompress the bytes comprising a block by OR:ing the contents into `*bits`
+void DecompressBlock(const std::basic_string<unsigned char> &block_header_bytes, const std::basic_string<unsigned char> &block_bytes, Alignment *bits);
+//
+// Decompress the bytes comprising a block into a returned `Alignment`
+Alignment DecompressBlock2(const json &file_header, const std::basic_string<unsigned char> &block_header_bytes, const std::basic_string<unsigned char> &block_bytes);
 
-// Function for reading the header line of the alignment file
-nlohmann::json_abi_v3_11_3::json ReadHeader(std::istream *in, size_t *n_reads, size_t *n_refs);
 }
 
 #endif

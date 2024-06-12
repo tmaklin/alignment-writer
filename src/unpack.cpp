@@ -34,17 +34,15 @@
 //
 #include "unpack.hpp"
 
-#include <string>
 #include <cmath>
 #include <sstream>
 #include <exception>
 
-#include "nlohmann/json.hpp"
 #include "bmserial.h"
 #include "bxzstr.hpp"
 #include "BS_thread_pool.hpp"
+#include "nlohmann/json.hpp"
 
-#include "Alignment.hpp"
 #include "printer.hpp"
 
 namespace alignment_writer {
@@ -123,19 +121,14 @@ std::basic_string<unsigned char> ReadBytes(const size_t bytes, std::istream *in)
     return std::basic_string<unsigned char>(buf, bytes);
 }
 
-std::basic_string<unsigned char> ReadBlockHeader(std::istream *in, size_t *block_size) {
+void ReadBlock(std::istream *in, std::basic_string<unsigned char> *block_header, std::basic_string<unsigned char> *block) {
+    // Read the size of the block header and block contents
     const json &header_data = json::parse(ReadHeader(in));
     size_t header_buffer_size = (size_t)header_data["header_size"];
-    *block_size = (size_t)header_data["block_size"];
+    size_t block_size = (size_t)header_data["block_size"];
 
-    std::basic_string<unsigned char> ret = ReadBytes(header_buffer_size, in);
-
-    return ret; // Use DecompressXZ to read contents is needed
-}
-
-void ReadBlock(std::istream *in, std::basic_string<unsigned char> *block_header, std::basic_string<unsigned char> *block) {
-    size_t block_size = 0;
-    (*block_header) = std::move(ReadBlockHeader(in, &block_size));
+    // Read the block header and contents
+    (*block_header) = std::move(ReadBytes(header_buffer_size, in));
     (*block) = std::move(ReadBytes(block_size, in));
 }
 
