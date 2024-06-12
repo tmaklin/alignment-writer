@@ -47,41 +47,55 @@
 #include "printer.hpp"
 
 namespace alignment_writer {
-bool check_xz_header(std::istream *in, std::stringbuf *out) {
-    (*out) = std::stringbuf();
-    for (size_t i = 0; i < 6; ++i) {
-	out->sputc(in->get());
+bool read_xz_header(std::istream *in, std::basic_string<unsigned char> *out) {
+    for (size_t i = 0; i < 6 && in->good() && in->peek() != EOF; ++i) {
+	out->push_back(in->get());
     }
-    unsigned char b0 = out->str()[0];
-    unsigned char b1 = out->str()[1];
-    unsigned char b2 = out->str()[2];
-    unsigned char b3 = out->str()[3];
-    unsigned char b4 = out->str()[4];
-    unsigned char b5 = out->str()[5];
+    if (out->size() < 6) {
+	return 0;
+    }
 
-    bool is_xz_header = (b0 == 0xFD && b1 == 0x37 && b2 == 0x7A
-			&& b3 == 0x58 && b4 == 0x5A && b5 == 0x00);
+
+    bool is_xz_header = ((*out)[0] == 0xFD);
+    is_xz_header &= ((*out)[1] == 0x37);
+    is_xz_header &= ((*out)[2] == 0x7A);
+    is_xz_header &= ((*out)[3] == 0x58);
+    is_xz_header &= ((*out)[4] == 0x5A);
+    is_xz_header &= ((*out)[5] == 0x00);
+
     return is_xz_header;
 }
 
-bool read_until_xz_end(std::istream *in, std::stringbuf *out) {
+bool read_until_xz_end(std::istream *in, std::basic_string<unsigned char> *out) {
     bool stream_end = false;
     while (!stream_end && in->good()) {
 	unsigned char next = in->get();
-	out->sputc(next);
+	out->push_back(next);
 	if (next == 0x59) {
 	    // Possibly found stream end
 	    unsigned char nextnext = in->get();
-	    out->sputc(nextnext);
+	    out->push_back(nextnext);
 	    stream_end = (nextnext == 0x5A);
 	}
     }
     return stream_end && in->good();
 }
 
-nlohmann::json_abi_v3_11_3::json ReadHeader(std::istream *in) {
-    std::stringbuf buffer;
-    if (!check_xz_header(in, &buffer)) {
+std::basic_string<char> decompress_xz(const std::basic_string<unsigned char> &buffer) {
+    std::basic_stringstream<unsigned char> str(buffer);
+    bxz::istream instr(reinterpret_cast<std::stringbuf*>(str.rdbuf()));
+    std::string out;
+    std::string read;
+    while (instr.good() && instr.peek() != EOF) {
+	out += instr.get();
+    }
+
+    return out;
+}
+
+std::basic_string<char> ReadHeader(std::istream *in) {
+    std::basic_string<unsigned char> buffer;
+    if (!read_xz_header(in, &buffer)) {
 	throw std::runtime_error("Input file does not start with a .xz stream header.");
     }
 
@@ -89,30 +103,10 @@ nlohmann::json_abi_v3_11_3::json ReadHeader(std::istream *in) {
 	throw std::runtime_error("Unexpected end of input.");
     }
 
-    bxz::istream instr(&buffer);
-    const nlohmann::json_abi_v3_11_3::json &header = nlohmann::json_abi_v3_11_3::json::parse(instr);
+    std::basic_string<char> header = decompress_xz(buffer);
 
     return header;
 }
-
-nlohmann::json_abi_v3_11_3::json DeserializeBlockHeader(std::stringbuf &buffer) {
-    bxz::istream instr(&buffer);
-    return nlohmann::json_abi_v3_11_3::json::parse(instr);
-}
-
-std::stringbuf ReadBlockHeader(std::istream *in, size_t *block_size) {
-    const auto &header_data = ReadHeader(in);
-    size_t header_buffer_size = (size_t)header_data["header_size"];
-    *block_size = (size_t)header_data["block_size"];
-
-    std::stringbuf ret_buffer;
-    for (size_t i = 0; i < header_buffer_size; ++i) {
-	ret_buffer.sputc(in->get());
-    }
-
-    return ret_buffer; // Use DeserializeBlockHeader to read contents is needed
-}
-
 
 std::basic_string<unsigned char> ReadBytes(const size_t bytes, std::istream *in) {
     // Allocate space for the block
@@ -128,17 +122,26 @@ std::basic_string<unsigned char> ReadBytes(const size_t bytes, std::istream *in)
     return std::basic_string<unsigned char>(buf, bytes);
 }
 
-std::basic_string<unsigned char> ReadBlock(std::istream *in, std::stringbuf *block_header) {
-    size_t block_size = 0;
-    (*block_header) = std::move(ReadBlockHeader(in, &block_size));
-    const std::basic_string<unsigned char> &buf = ReadBytes(block_size, in);
-    return buf;
+std::basic_string<unsigned char> ReadBlockHeader(std::istream *in, size_t *block_size) {
+    const json &header_data = json::parse(ReadHeader(in));
+    size_t header_buffer_size = (size_t)header_data["header_size"];
+    *block_size = (size_t)header_data["block_size"];
+
+    std::basic_string<unsigned char> ret = ReadBytes(header_buffer_size, in);
+
+    return ret; // Use DecompressXZ to read contents is needed
 }
 
-void DecompressBlock(std::stringbuf &block_header_ser, std::basic_string<unsigned char> &bytes, Alignment *bits) {
-    auto block_headers = DeserializeBlockHeader(block_header_ser);
+void ReadBlock(std::istream *in, std::basic_string<unsigned char> *block_header, std::basic_string<unsigned char> *block) {
+    size_t block_size = 0;
+    (*block_header) = std::move(ReadBlockHeader(in, &block_size));
+    (*block) = std::move(ReadBytes(block_size, in));
+}
+
+void DecompressBlock(const std::basic_string<unsigned char> &block_header_bytes, const std::basic_string<unsigned char> &block_bytes, Alignment *bits) {
+    const json &block_headers = json::parse(decompress_xz(block_header_bytes));
     bits->annotate(block_headers);
-    bm::deserialize(*bits, bytes.data());
+    bm::deserialize(*bits, block_bytes.data());
 }
 
 void Print(const Format &format, std::istream *in, std::ostream *out) {
@@ -146,7 +149,7 @@ void Print(const Format &format, std::istream *in, std::ostream *out) {
     Printer printer(format);
 
     // Read size of alignment from the file
-    const nlohmann::json_abi_v3_11_3::json &file_header = ReadHeader(in);
+    const json &file_header = json::parse(ReadHeader(in));
     size_t n_reads = file_header["n_queries"];
     size_t n_refs = file_header["n_targets"];
 
@@ -156,12 +159,12 @@ void Print(const Format &format, std::istream *in, std::ostream *out) {
     // Stream the output
     while (in->good() && in->peek() != EOF) {
 	// Read next block
-	std::stringbuf block_header_ser;
+	std::basic_string<unsigned char> block_header_bytes;
 	std::basic_string<unsigned char> block_bytes;
-	block_bytes = std::move(ReadBlock(in, &block_header_ser));
+	ReadBlock(in, &block_header_bytes, &block_bytes);
 
 	// Deserialize and print contents
-	DecompressBlock(block_header_ser, block_bytes, bits);
+	DecompressBlock(block_header_bytes, block_bytes, &alignment);
 	const std::stringbuf &ret = printer.format(alignment);
 	*out << ret.str();
 	alignment.clear(false);
