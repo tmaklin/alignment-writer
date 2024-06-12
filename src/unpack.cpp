@@ -141,14 +141,14 @@ void ReadBlock(std::istream *in, std::basic_string<unsigned char> *block_header,
 
 void DecompressBlock(const std::basic_string<unsigned char> &block_header_bytes, const std::basic_string<unsigned char> &block_bytes, Alignment *bits) {
     const json &block_headers = json::parse(decompress_xz(block_header_bytes));
-    bits->annotate(block_headers);
+    bits->annotate(block_headers["queries"]);
     bm::deserialize(*bits, block_bytes.data());
 }
 
 Alignment DecompressBlock2(const json &file_header, const std::basic_string<unsigned char> &block_header_bytes, const std::basic_string<unsigned char> &block_bytes) {
     Alignment bits(file_header);
     const json &block_headers = json::parse(decompress_xz(block_header_bytes));
-    bits.annotate(block_headers);
+    bits.annotate(block_headers["queries"]);
     bm::deserialize(bits, block_bytes.data());
     return bits;
 }
