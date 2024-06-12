@@ -45,7 +45,7 @@
 
 namespace alignment_writer {
 // Print data that has been written using BufferedPack
-void Print(const Format &format, std::istream *in, std::ostream *out);
+void Print(const Format &format, std::istream *in, std::ostream *out, size_t n_threads=1);
 void StreamingPrint(std::istream *in, std::ostream *out);
 
 // Read in pseudoalignment data written using BufferedPack

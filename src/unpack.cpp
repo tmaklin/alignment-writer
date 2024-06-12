@@ -42,6 +42,7 @@
 #include "nlohmann/json.hpp"
 #include "bmserial.h"
 #include "bxzstr.hpp"
+#include "BS_thread_pool.hpp"
 
 #include "Alignment.hpp"
 #include "printer.hpp"
@@ -144,7 +145,15 @@ void DecompressBlock(const std::basic_string<unsigned char> &block_header_bytes,
     bm::deserialize(*bits, block_bytes.data());
 }
 
-void Print(const Format &format, std::istream *in, std::ostream *out) {
+Alignment DecompressBlock2(const json &file_header, const std::basic_string<unsigned char> &block_header_bytes, const std::basic_string<unsigned char> &block_bytes) {
+    Alignment bits(file_header);
+    const json &block_headers = json::parse(decompress_xz(block_header_bytes));
+    bits.annotate(block_headers);
+    bm::deserialize(bits, block_bytes.data());
+    return bits;
+}
+
+void Print(const Format &format, std::istream *in, std::ostream *out, size_t n_threads) {
     // Initialize formatter
     Printer printer(format);
 
@@ -153,21 +162,40 @@ void Print(const Format &format, std::istream *in, std::ostream *out) {
     size_t n_reads = file_header["n_queries"];
     size_t n_refs = file_header["n_targets"];
 
-    // Deserialize the file
-    Alignment alignment(file_header);
+    BS::thread_pool pool(n_threads);
 
+    std::vector<std::basic_string<unsigned char>> block_header_bytes;
+    std::vector<std::basic_string<unsigned char>> block_bytes;
+    std::vector<std::future<Alignment>> futures;
     // Stream the output
     while (in->good() && in->peek() != EOF) {
-	// Read next block
-	std::basic_string<unsigned char> block_header_bytes;
-	std::basic_string<unsigned char> block_bytes;
-	ReadBlock(in, &block_header_bytes, &block_bytes);
-
-	// Deserialize and print contents
-	DecompressBlock(block_header_bytes, block_bytes, &alignment);
-	const std::stringbuf &ret = printer.format(alignment);
-	*out << ret.str();
-	alignment.clear(false);
+	if (block_bytes.size() < n_threads) {
+	    // Read blocks until each thread has something to process
+	    block_header_bytes.emplace_back(std::basic_string<unsigned char>());
+	    block_bytes.emplace_back(std::basic_string<unsigned char>());
+	    ReadBlock(in, &block_header_bytes.back(), &block_bytes.back());
+	    futures.emplace_back(pool.submit(DecompressBlock2, file_header, block_header_bytes.back(), block_bytes.back()));
+	} else {
+	    // Process all blocks
+	    for (size_t i = 0; i < futures.size(); ++i) {
+		// Deserialize and print contents
+		const Alignment &alignment = futures[i].get();
+		const std::stringbuf &ret = printer.format(alignment);
+		*out << ret.str();
+	    }
+	    // Clear thread buffers
+	    block_header_bytes.clear();
+	    block_bytes.clear();
+	    futures.clear();
+	}
+    }
+    // Process remaining blocks
+    if (futures.size() > 0) {
+	for (size_t i = 0; i < futures.size(); ++i) {
+	    const Alignment &alignment = futures[i].get();
+	    const std::stringbuf &ret = printer.format(alignment);
+	    *out << ret.str();
+	}
     }
 }
 }
