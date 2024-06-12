@@ -198,4 +198,50 @@ void Print(const Format &format, std::istream *in, std::ostream *out, size_t n_t
 	}
     }
 }
+
+Alignment Read(std::istream *in, size_t n_threads) {
+    // Read size of alignment from the file
+    const json &file_header = json::parse(ReadHeader(in));
+    size_t n_reads = file_header["n_queries"];
+    size_t n_refs = file_header["n_targets"];
+
+    Alignment alignment(file_header);
+    BS::thread_pool pool(n_threads);
+
+    std::vector<std::basic_string<unsigned char>> block_header_bytes;
+    std::vector<std::basic_string<unsigned char>> block_bytes;
+    std::vector<std::future<Alignment>> futures;
+    // Stream the output
+    while (in->good() && in->peek() != EOF) {
+	if (block_bytes.size() < n_threads) {
+	    // Read blocks until each thread has something to process
+	    block_header_bytes.emplace_back(std::basic_string<unsigned char>());
+	    block_bytes.emplace_back(std::basic_string<unsigned char>());
+	    ReadBlock(in, &block_header_bytes.back(), &block_bytes.back());
+	    futures.emplace_back(pool.submit(DecompressBlock2, file_header, block_header_bytes.back(), block_bytes.back()));
+	} else {
+	    // Process all blocks
+	    for (size_t i = 0; i < futures.size(); ++i) {
+		// Deserialize and print contents
+		const Alignment &got = futures[i].get();
+		alignment.bit_or(got);
+		alignment.annotate(got.annotation());
+	    }
+	    // Clear thread buffers
+	    block_header_bytes.clear();
+	    block_bytes.clear();
+	    futures.clear();
+	}
+    }
+    // Process remaining blocks
+    if (futures.size() > 0) {
+	for (size_t i = 0; i < futures.size(); ++i) {
+	    const Alignment &got = futures[i].get();
+	    alignment.bit_or(got);
+	    alignment.annotate(got.annotation());
+	}
+    }
+
+    return alignment;
+}
 }
