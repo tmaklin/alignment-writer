@@ -135,41 +135,38 @@ std::basic_string<unsigned char> ReadBlock(std::istream *in, std::stringbuf *blo
     return buf;
 }
 
-Alignment DecompressStream(std::istream *in) {
+void DecompressBlock(std::stringbuf &block_header_ser, std::basic_string<unsigned char> &bytes, Alignment *bits) {
+    auto block_headers = DeserializeBlockHeader(block_header_ser);
+    bits->annotate(block_headers);
+    bm::deserialize(*bits, bytes.data());
+}
+
+void DecompressStreamBlock(std::istream *in, Alignment *bits) {
+    // Consume stream
+    std::stringbuf block_header_ser;
+    std::basic_string<unsigned char> block_bytes;
+    block_bytes = std::move(ReadBlock(in, &block_header_ser));
+    DecompressBlock(block_header_ser, block_bytes, bits);
+}
+
+void Print(const Format &format, std::istream *in, std::ostream *out) {
+    // Initialize formatter
+    Printer printer(format);
+
     // Read size of alignment from the file
     const nlohmann::json_abi_v3_11_3::json &file_header = ReadHeader(in);
     size_t n_reads = file_header["n_queries"];
     size_t n_refs = file_header["n_targets"];
 
-    // Consume stream
-    std::string line;
-    bool first = true;
-    Alignment bits(file_header);
-    std::vector<std::basic_string<unsigned char>> buffers;
-    while (in->good() && in->peek() != EOF) {
-	std::stringbuf block_header_ser;
-	buffers.emplace_back(ReadBlock(in, &block_header_ser));
-	auto block_headers = DeserializeBlockHeader(block_header_ser);
-	bits.annotate(block_headers);
-    }
-
-    // Deserialize
-    for (auto buffer : buffers) {
-	bm::deserialize(bits, buffer.data());
-    }
-
-    return bits;
-}
-
-void Print(const Format &format, std::istream *in, std::ostream *out) {
     // Deserialize the file
-    const Alignment &alignment = DecompressStream(in);
+    Alignment alignment(file_header);
 
-    // Initialize formatter
-    Printer printer(format);
-
-    // Print results
-    const std::stringbuf &ret = printer.format(alignment);
-    *out << ret.str();
+    // Stream the output
+    while (in->good() && in->peek() != EOF) {
+	DecompressStreamBlock(in, &alignment);
+	const std::stringbuf &ret = printer.format(alignment);
+	*out << ret.str();
+	alignment.clear(false);
+    }
 }
 }
