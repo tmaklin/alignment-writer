@@ -53,38 +53,34 @@ private:
     size_t n_queries;
     size_t n_targets;
     std::vector<std::string> targets_names;
-    bm::bvector<> bitvector;
 
     // May optionally have these
     json query_metadata;
     std::string format;
 
 public:
-    Alignment(size_t _n_queries, const std::vector<std::string> &_targets_names) {
+    Alignment(size_t _n_queries, const std::vector<std::string> &_targets_names) : bm::bvector<>((size_t)(_n_queries * (size_t)_targets_names.size()), bm::BM_GAP) {
 	this->n_queries = _n_queries;
 	this->n_targets = _targets_names.size();
 	this->targets_names = _targets_names;
-	this->bitvector = bm::bvector<>((size_t)(n_queries * n_targets), bm::BM_GAP);
     }
 
-    Alignment(size_t _n_queries, const std::unordered_map<std::string, size_t>& _targets_names_to_pos) {
+    Alignment(size_t _n_queries, const std::unordered_map<std::string, size_t>& _targets_names_to_pos) : bm::bvector<>((size_t)(_n_queries * (size_t)_targets_names_to_pos.size()), bm::BM_GAP) {
 	this->n_queries = _n_queries;
 	this->n_targets = _targets_names_to_pos.size();
 	this->targets_names = std::vector<std::string>(_targets_names_to_pos.size());
 	for (auto kv : _targets_names_to_pos) {
 	    this->targets_names[kv.second] = kv.first;
 	}
-	this->bitvector = bm::bvector<>((size_t)(n_queries * n_targets), bm::BM_GAP);
     }
 
-    Alignment(const json& file_header) {
+    Alignment(const json& file_header) : bm::bvector<>((size_t)((size_t)file_header["n_queries"] * (size_t)file_header["n_targets"]), bm::BM_GAP) {
 	this->n_queries = file_header["n_queries"];
 	this->n_targets = file_header["n_targets"];
 	this->targets_names = std::vector<std::string>(this->n_targets);
 	for (auto kv : file_header["targets"]) {
 	    this->targets_names[kv["pos"]] = kv["target"];
 	}
-	this->bitvector = bm::bvector<>((size_t)(this->n_queries * this->n_targets), bm::BM_GAP);
 	this->format = file_header["input_format"];
     }
 
@@ -97,11 +93,11 @@ public:
 	}
     }
 
-    // Zero all alignments and delete info about queries
-    void clear(bool free_mem=true) { this->bitvector.clear(free_mem); this->query_metadata.clear(); }
+    void clear(bool free_mem=true) { bm::bvector<>::clear(free_mem); this->query_metadata.clear(); }
 
     // Get query annotation
     const json& annotation() const { return this->query_metadata; }
+    void clear_annotation() { this->query_metadata.clear(); }
 
     // Get number of queries or targets
     const size_t queries() const { return this->n_queries; }
@@ -112,9 +108,6 @@ public:
 
     // Get original format the alignment was written in
     const std::string& input_format() const { return this->format; }
-
-    // Get underlying BitMagic representation
-    const bm::bvector<>& raw() const { return this->bitvector; }
 };
 }
 
