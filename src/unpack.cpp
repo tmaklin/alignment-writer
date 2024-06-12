@@ -141,14 +141,6 @@ void DecompressBlock(std::stringbuf &block_header_ser, std::basic_string<unsigne
     bm::deserialize(*bits, bytes.data());
 }
 
-void DecompressStreamBlock(std::istream *in, Alignment *bits) {
-    // Consume stream
-    std::stringbuf block_header_ser;
-    std::basic_string<unsigned char> block_bytes;
-    block_bytes = std::move(ReadBlock(in, &block_header_ser));
-    DecompressBlock(block_header_ser, block_bytes, bits);
-}
-
 void Print(const Format &format, std::istream *in, std::ostream *out) {
     // Initialize formatter
     Printer printer(format);
@@ -163,7 +155,13 @@ void Print(const Format &format, std::istream *in, std::ostream *out) {
 
     // Stream the output
     while (in->good() && in->peek() != EOF) {
-	DecompressStreamBlock(in, &alignment);
+	// Read next block
+	std::stringbuf block_header_ser;
+	std::basic_string<unsigned char> block_bytes;
+	block_bytes = std::move(ReadBlock(in, &block_header_ser));
+
+	// Deserialize and print contents
+	DecompressBlock(block_header_ser, block_bytes, bits);
 	const std::stringbuf &ret = printer.format(alignment);
 	*out << ret.str();
 	alignment.clear(false);
