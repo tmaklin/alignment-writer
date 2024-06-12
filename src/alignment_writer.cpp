@@ -180,7 +180,7 @@ int main(int argc, char* argv[]) {
 	// Compress from cin to cout
 	if (args["decompress"].as<bool>()) {
 	    try {
-		alignment_writer::Print(format, &std::cin, &std::cout);
+		alignment_writer::Print(format, &std::cin, &std::cout, args["threads"].as<size_t>());
 	    } catch (const std::exception &e) {
 		std::cerr << program_name + ": error in reading compressed data from terminal: " << e.what() << std::endl;
 		return 1;
@@ -317,7 +317,7 @@ int main(int argc, char* argv[]) {
 		std::ifstream in_stream(infile);
 		if (args["stdout"].as<bool>()) {
 		    try {
-			alignment_writer::Print(format, &in_stream, &std::cout);
+			alignment_writer::Print(format, &in_stream, &std::cout, args["threads"].as<size_t>());
 		    } catch (const std::exception &e) {
 			std::cerr << program_name + ": error in reading compressed file " + infile << ": " << e.what() << std::endl;
 			return 1;
@@ -325,7 +325,7 @@ int main(int argc, char* argv[]) {
 		} else {
 		    std::ofstream out_stream(outfile);
 		    try {
-			alignment_writer::Print(format, &in_stream, &out_stream);
+			alignment_writer::Print(format, &in_stream, &out_stream, args["threads"].as<size_t>());
 		    } catch (const std::exception &e) {
 			std::cerr << program_name + ": error in decompressing file " + infile << " to file " << outfile << ": " << e.what() << std::endl;
 			return 1;
