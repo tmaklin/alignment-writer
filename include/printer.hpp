@@ -42,6 +42,7 @@
 #include <sstream>
 #include <unordered_set>
 #include <functional>
+#include<limits>
 
 #include "bm64.h"
 #include "nlohmann/json.hpp"
@@ -84,13 +85,18 @@ inline std::stringbuf FulgorPrinter(const Alignment &bits) {
     bm::bvector<>::enumerator en = bits.first();
     bm::bvector<>::enumerator en_end = bits.end();
 
-    std::unordered_map<size_t, std::string> query_map;
+    std::map<size_t, std::string> query_map; // Need to iterate in order
+    size_t first_read = std::numeric_limits<size_t>::max();
+    size_t last_read = 0;
     for (auto kv : bits.annotation()) {
-	query_map.insert(std::make_pair(kv["pos"], kv["query"]));
+	size_t read_id = (size_t)kv["pos"];
+	first_read = (first_read <= read_id ? first_read : read_id);
+	last_read = (last_read >= read_id ? last_read : read_id);
+	query_map.insert(std::make_pair(read_id, kv["query"]));
     }
 
     std::string out;
-    for (size_t i = 0; i < n_reads; ++i) {
+    for (size_t i = first_read; i <= last_read; ++i) {
 	out += query_map.at(i);
 	out += '\t';
 	std::vector<size_t> mapped_targets;
@@ -124,9 +130,14 @@ inline std::stringbuf BifrostPrinter(const Alignment &bits) {
     bm::bvector<>::enumerator en = bits.first();
     bm::bvector<>::enumerator en_end = bits.end();
 
-    std::unordered_map<size_t, std::string> query_map;
+    std::map<size_t, std::string> query_map; // Need to iterate in order
+    size_t first_read = std::numeric_limits<size_t>::max();
+    size_t last_read = 0;
     for (auto kv : bits.annotation()) {
-	query_map.insert(std::make_pair(kv["pos"], kv["query"]));
+	size_t read_id = (size_t)kv["pos"];
+	first_read = (first_read <= read_id ? first_read : read_id);
+	last_read = (last_read >= read_id ? last_read : read_id);
+	query_map.insert(std::make_pair(read_id, kv["query"]));
     }
 
     const std::vector<std::string> &targets = bits.target_names();
@@ -139,7 +150,7 @@ inline std::stringbuf BifrostPrinter(const Alignment &bits) {
 	out += ((i == n_refs - 1) ? '\n' : '\t');
     }
 
-    for (size_t i = 0; i < n_reads; ++i) {
+    for (size_t i = first_read; i <= last_read; ++i) {
 	out += query_map.at(i);
 	out += '\t';
 	std::vector<bool> alignment(n_refs, false);
@@ -167,8 +178,13 @@ inline std::stringbuf MetagraphPrinter(const Alignment &bits) {
     bm::bvector<>::enumerator en_end = bits.end();
 
     std::map<size_t, std::string> query_map; // Need to iterate in order
+    size_t first_read = std::numeric_limits<size_t>::max();
+    size_t last_read = 0;
     for (auto kv : bits.annotation()) {
-	query_map.insert(std::make_pair(kv["pos"], kv["query"]));
+	size_t read_id = (size_t)kv["pos"];
+	first_read = (first_read <= read_id ? first_read : read_id);
+	last_read = (last_read >= read_id ? last_read : read_id);
+	query_map.insert(std::make_pair(read_id, kv["query"]));
     }
 
     std::unordered_map<size_t, std::string> target_map;
@@ -177,20 +193,20 @@ inline std::stringbuf MetagraphPrinter(const Alignment &bits) {
     }
 
     std::string out;
-    for (auto query : query_map) {
-	out += std::to_string(query.first);
+    for (size_t i = first_read; i <= last_read; ++i) {
+	out += std::to_string(i);
 	out += '\t';
-	out += query.second;
+	out += query_map.at(i);
 	out += '\t';
-	if (*en < query.first*n_refs + n_refs) { // Next pseudoalignment is for this read
+	if (*en < i*n_refs + n_refs) { // Next pseudoalignment is for this read
 	    // Write found pseudoalignments using the enumerator
 	    bool first = true;
-	    while (*en < query.first*n_refs + n_refs && en < en_end) {
+	    while (*en < i*n_refs + n_refs && en < en_end) {
 		if (!first) {
 		    out += ':';
 		}
 		first = false;
-		out += target_map.at((*en) - query.first*n_refs);
+		out += target_map.at((*en) - i*n_refs);
 		++en;
 	    }
 	}
@@ -207,9 +223,14 @@ inline std::stringbuf SAMPrinter(const Alignment &bits) {
     bm::bvector<>::enumerator en = bits.first();
     bm::bvector<>::enumerator en_end = bits.end();
 
-    std::unordered_map<size_t, std::string> query_map;
+    std::map<size_t, std::string> query_map; // Need to iterate in order
+    size_t first_read = std::numeric_limits<size_t>::max();
+    size_t last_read = 0;
     for (auto kv : bits.annotation()) {
-	query_map.insert(std::make_pair(kv["pos"], kv["query"]));
+	size_t read_id = (size_t)kv["pos"];
+	first_read = (first_read <= read_id ? first_read : read_id);
+	last_read = (last_read >= read_id ? last_read : read_id);
+	query_map.insert(std::make_pair(read_id, kv["query"]));
     }
 
     std::unordered_map<size_t, std::string> target_map;
@@ -231,7 +252,7 @@ inline std::stringbuf SAMPrinter(const Alignment &bits) {
     out += ALIGNMENT_WRITER_BUILD_VERSION;
     out += '\n';
 
-    for (size_t i = 0; i < n_reads; ++i) {
+    for (size_t i = first_read; i <= last_read; ++i) {
 	std::vector<size_t> targets;
 	if (*en < i*n_refs + n_refs) { // Next pseudoalignment is for this read
 	    // Write found pseudoalignments using the enumerator
@@ -245,7 +266,7 @@ inline std::stringbuf SAMPrinter(const Alignment &bits) {
 		out += query_map.at(i);
 		out +="\t0\t";
 		out += target_map.at(targets[j]);
-		out += "\t'1\t255\t*\t*\t0\t0\t";
+		out += "\t1\t255\t*\t*\t0\t0\t";
 		out += "*\t*\n";
 	    }
 	} else {
