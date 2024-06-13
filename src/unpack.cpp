@@ -36,9 +36,9 @@
 
 #include <lzma.h>
 
-#include <cmath>
-#include <sstream>
 #include <exception>
+#include <vector>
+#include <future>
 
 #include "bmserial.h"
 #include "BS_thread_pool.hpp"
@@ -147,16 +147,12 @@ std::basic_string<char> ReadHeader(std::istream *in) {
 
 std::basic_string<unsigned char> ReadBytes(const size_t bytes, std::istream *in) {
     // Allocate space for the block
-    std::basic_string<char> cbuf(bytes, '=');
-    // char* cbuf = new char[bytes];
+    std::basic_string<unsigned char> cbuf(bytes, '=');
 
     // Read the next block into buf
-    in->read(cbuf.data(), bytes);
+    in->read(reinterpret_cast<char*>(cbuf.data()), bytes);
 
-    // Store the block in `vals`
-    unsigned char* buf = reinterpret_cast<unsigned char*>(cbuf.data());
-
-    return std::basic_string<unsigned char>(buf, bytes);
+    return cbuf;
 }
 
 void ReadBlock(std::istream *in, std::basic_string<unsigned char> *block_header, std::basic_string<unsigned char> *block) {
