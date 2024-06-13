@@ -34,18 +34,37 @@
 //
 #include "unpack.hpp"
 
+#include <lzma.h>
+
 #include <cmath>
 #include <sstream>
 #include <exception>
 
 #include "bmserial.h"
-#include "bxzstr.hpp"
 #include "BS_thread_pool.hpp"
 #include "nlohmann/json.hpp"
 
 #include "printer.hpp"
 
 namespace alignment_writer {
+bool check_xz_return_code(int code) {
+    // Check for fatal return codes
+    switch(code) {
+    case LZMA_MEM_ERROR:
+	throw std::bad_alloc();
+    case LZMA_FORMAT_ERROR:
+	throw std::runtime_error("Input is not in the .xz format.");
+    case LZMA_OPTIONS_ERROR:
+	throw std::invalid_argument("Unsupported compression options.");
+    case LZMA_DATA_ERROR:
+	throw std::runtime_error("Compressed file is corrupt.");
+    case LZMA_PROG_ERROR:
+	throw std::runtime_error("Decoder internal state is invalid.");
+    default:
+	return 1;
+    }
+}
+
 bool read_xz_header(std::istream *in, std::basic_string<unsigned char> *out) {
     for (size_t i = 0; i < 6 && in->good() && in->peek() != EOF; ++i) {
 	out->push_back(in->get());
@@ -81,14 +100,33 @@ bool read_until_xz_end(std::istream *in, std::basic_string<unsigned char> *out) 
 }
 
 std::basic_string<char> decompress_xz(const std::basic_string<unsigned char> &buffer) {
-    std::basic_stringstream<unsigned char> str(buffer);
-    bxz::istream instr(reinterpret_cast<std::stringbuf*>(str.rdbuf()));
-    std::string out;
-    std::string read;
-    while (instr.good() && instr.peek() != EOF) {
-	out += instr.get();
-    }
+    lzma_stream strm(LZMA_STREAM_INIT);
+    int ret = lzma_stream_decoder(&strm, UINT64_MAX, LZMA_CONCATENATED);
+    check_xz_return_code(ret);
 
+    size_t bufsize = 256000;
+    unsigned char outbuf[bufsize];
+
+    strm.avail_out = sizeof(outbuf);
+    strm.next_out = outbuf;
+
+    strm.avail_in = buffer.size();
+    strm.next_in = const_cast<unsigned char*>(&buffer.front());
+
+    std::basic_string<char> out;
+    do {
+	ret = lzma_code(&strm, LZMA_RUN);
+	check_xz_return_code(ret);
+	if (strm.avail_out == 0) {
+	    out.append(reinterpret_cast<char*>(outbuf), bufsize);
+	    strm.next_out = outbuf;
+	    strm.avail_out = sizeof(outbuf);
+	}
+    } while (ret == LZMA_OK);
+
+    lzma_end(&strm);
+
+    out.append(reinterpret_cast<char*>(outbuf), bufsize - strm.avail_out);
     return out;
 }
 
